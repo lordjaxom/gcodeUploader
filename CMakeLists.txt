@@ -1,10 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(gcodeUploader)
 
-# Environment Configuration
-set(nana_ROOT_DIR E:/MinGW/3rdparty/nana-1.4.1)
-set(asio_ROOT_DIR E:/MinGW/3rdparty/asio-1.10.6)
-set(websocketpp_ROOT_DIR E:/MinGW/3rdparty/websocketpp-master)
+include(CMakeLocal.cmake)
 
 add_compile_options(-Wall -Wno-unused-variable -Wno-strict-aliasing -std=c++11)
 
@@ -16,7 +13,7 @@ set(SOURCE_FILES
         repetier_client.hpp
         resource.rc)
 
-find_package(Boost COMPONENTS "" REQUIRED)
+find_package(Boost COMPONENTS system thread  REQUIRED)
 
 find_path(nana_INCLUDE_DIRS nana/config.hpp HINTS ${nana_ROOT_DIR}/include)
 find_library(nana_LIBRARIES NAMES nana libnana HINTS ${nana_ROOT_DIR})
@@ -30,3 +27,6 @@ add_executable(gcodeUploader ${SOURCE_FILES})
 target_compile_definitions(gcodeUploader PRIVATE ${asio_DEFINITIONS})
 target_include_directories(gcodeUploader PRIVATE ${Boost_INCLUDE_DIRS} ${nana_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS})
 target_link_libraries(gcodeUploader ${Boost_LIBRARIES} ${nana_LIBRARIES})
+if(WIN32)
+    target_link_libraries(gcodeUploader ws2_32)
+endif()
