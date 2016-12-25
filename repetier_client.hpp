@@ -1,30 +1,40 @@
 #ifndef GCODEUPLOADER_REPETIER_CLIENT_HPP
 #define GCODEUPLOADER_REPETIER_CLIENT_HPP
 
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <thread>
 
-#include <boost/thread.hpp>
+#include "repetier_definitions.hpp"
 
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <websocketpp/client.hpp>
+namespace asio {
+    class io_service;
+} // namespace asio
 
 namespace gcu {
+    namespace repetier {
 
-    class RepetierClient
-    {
-        using wsclient = websocketpp::client< websocketpp::config::asio_client >;
+        class Connection;
 
-    public:
-        RepetierClient();
-        explicit RepetierClient( asio::io_service& service );
+        class Client
+        {
+        public:
+            Client( std::string const& hostname, std::uint16_t port, std::string const& apikey );
+            Client( std::string const& hostname, std::uint16_t port, std::string const& apikey, asio::io_service* io_service );
+            ~Client();
 
-    private:
-        void init();
+        private:
+            Client();
 
-        wsclient client_;
-        std::unique_ptr< boost::thread > thread_;
-    };
+            void connect( std::string const& hostname, std::uint16_t port, std::string const& apikey );
 
+            std::thread io_thread_;
+            wsclient client_;
+            std::unique_ptr< Connection > connection_;
+        };
+
+    } // namespace repetier
 } // namespace gcu
 
 #endif //GCODEUPLOADER_REPETIER_CLIENT_HPP

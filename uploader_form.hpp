@@ -8,6 +8,8 @@
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/textbox.hpp>
 
+#include "repetier.hpp"
+
 namespace gcu {
 
     class UploaderForm
@@ -17,7 +19,7 @@ namespace gcu {
         UploaderForm();
 
     private:
-        void onUploadClick();
+        RepetierApi api_;
 
         nana::place place_ { *this };
         nana::label fileNameLabel_ { *this, "G-Code file:" };

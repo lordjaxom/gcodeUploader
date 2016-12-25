@@ -15,10 +15,8 @@ namespace gcu {
         modelNameLabel_.text_align( nana::align::left, nana::align_v::center );
 
         uploadButton_.events().click( [this] {
-            nana::msgbox message( *this, "Event", nana::msgbox::ok );
-            message.icon( nana::msgbox::icon_information );
-            message << "Upload clicked!";
-            message();
+            api_.connect( "makermac", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47" );
+            //client_.connect( "ws://192.168.178.70:3344/socket/?lang=de&apikey=7f77558d-75e1-45e1-b424-74c5c81b6b47" );
         } );
 
         place_.div( "vertical margin=10"
