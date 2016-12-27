@@ -8,10 +8,6 @@
 
 #include "repetier_definitions.hpp"
 
-namespace asio {
-    class io_service;
-} // namespace asio
-
 namespace gcu {
     namespace repetier {
 
@@ -22,6 +18,7 @@ namespace gcu {
         public:
             Client( std::string const& hostname, std::uint16_t port, std::string const& apikey );
             Client( std::string const& hostname, std::uint16_t port, std::string const& apikey, asio::io_service* io_service );
+            Client( Client const& ) = delete;
             ~Client();
 
         private:

@@ -17,8 +17,10 @@ set(SOURCE_FILES
         repetier_definitions.hpp
         repetier_connection.cpp
         repetier_connection.hpp
-        repetier_message.cpp
-        repetier_message.hpp)
+        repetier_conversation.cpp
+        repetier_conversation.hpp
+        repetier_action.cpp
+        repetier_action.hpp)
 
 set(CMAKE_CXX_STANDARD 14)
 

@@ -3,8 +3,8 @@
 
 #include <json/json.h>
 
+#include "repetier_action.hpp"
 #include "repetier_connection.hpp"
-#include "repetier_message.hpp"
 
 using namespace std::placeholders;
 
@@ -15,10 +15,6 @@ namespace gcu {
             : client_( client )
             , apikey_( apikey )
         {
-            Json::StreamWriterBuilder builder;
-            builder[ "indentation" ] = "";
-            jsonWriter_.reset( builder.newStreamWriter() );
-
             std::cout << "connecting to RepetierServer at " << url << "\n";
 
             std::error_code ec;
@@ -41,8 +37,7 @@ namespace gcu {
         void Connection::handleOpen()
         {
             status_ = OPEN;
-
-            sendMessage< LoginMessage >( "login", apikey_ );
+            send( factory_.createAction< LoginAction >( apikey_, []( char const* session ) { std::cout << "YAY! got session: " << session << "\n"; } ) );
         }
 
         void Connection::handleFail()
@@ -57,21 +52,16 @@ namespace gcu {
 
         void Connection::handleMessage( wsclient::message_ptr message )
         {
-
+            // std::cout << "<<< " << message->get_payload() << std::endl;
+            factory_.handleMessage( message->get_payload() );
         }
 
-        template< typename T, typename... Args >
-        void Connection::sendMessage( Args&&... args )
+        void Connection::send( Action const* action )
         {
-            std::size_t callbackId = ++nextCallbackId_;
-            std::unique_ptr< T > message( new T( callbackId, std::forward< Args >( args )... ) );
-
             auto connection = client_.get_con_from_hdl( handle_ );
-            auto payload = message->toString( *jsonWriter_ );
-            std::cout << ">>> " << payload << "\n";
+            auto payload = factory_.toString( action );
+            // std::cout << ">>> " << payload << "\n";
             connection->send( payload, websocketpp::frame::opcode::text );
-
-            pending_.emplace( callbackId, std::move( message ) );
         }
 
     } // namespace repetier
