@@ -32,7 +32,11 @@ namespace gcu {
             client_.connect( connection );
         }
 
-        Connection::~Connection() = default;
+        Connection::~Connection()
+        {
+            std::error_code ec;
+            client_.close( handle_, websocketpp::close::status::going_away, "", ec );
+        }
 
         void Connection::handleOpen()
         {
@@ -43,11 +47,16 @@ namespace gcu {
         void Connection::handleFail()
         {
             status_ = FAILED;
+            auto connection = client_.get_con_from_hdl( handle_ );
+            std::cout << "FAIL: " << connection->get_ec().message();
         }
 
         void Connection::handleClose()
         {
             status_ = CLOSED;
+            auto connection = client_.get_con_from_hdl( handle_ );
+            std::cout << "CLOSE: code " << websocketpp::close::status::get_string( connection->get_remote_close_code() )
+                      << ", reason: " << connection->get_remote_close_reason() << "\n";
         }
 
         void Connection::handleMessage( wsclient::message_ptr message )

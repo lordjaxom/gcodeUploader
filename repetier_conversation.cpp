@@ -37,7 +37,7 @@ namespace gcu {
             std::string errors;
             jsonReader_->parse( &*message.begin(), &*message.end(), &value, &errors );
 
-            if ( value[ "callback_id" ].asLargestUInt() != -1 ) {
+            if ( value[ "callback_id" ].asLargestInt() != -1 ) {
                 handleResponse( value );
             }
             else if ( value[ "eventList" ].asBool() ) {

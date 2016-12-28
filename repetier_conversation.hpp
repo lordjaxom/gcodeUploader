@@ -27,8 +27,8 @@ namespace gcu {
             template< typename T, typename... Args >
             T* createAction( Args&&... args )
             {
-                std::intmax_t callbackId = nextCallbackId_++;
-                T* action = new T( nextCallbackId_++, std::forward< Args >( args )... );
+                std::intmax_t callbackId = ++nextCallbackId_;
+                T* action = new T( callbackId, std::forward< Args >( args )... );
                 pendingActions_.emplace( callbackId, std::unique_ptr< Action >( action ) );
                 return action;
             }
