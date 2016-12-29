@@ -3,7 +3,9 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace Json {
     class Value;
@@ -15,40 +17,62 @@ namespace gcu {
         class Action
         {
         public:
-            Action( std::intmax_t callbackId, char const* action );
+            Action( char const* name );
             Action( Action const& ) = delete;
             virtual ~Action() = 0;
 
-            std::intmax_t callbackId() const { return callbackId_; }
-            char const* action() const { return action_; }
-
-            void handle( Json::Value const& value ) const;
-
-            void toJson( Json::Value& value ) const;
+            virtual Json::Value createOutgoing() const;
+            virtual void handleResponse( Json::Value const& response ) const;
 
         protected:
-            virtual void doHandle( Json::Value const& value ) const = 0;
-            virtual void doToJson( Json::Value& data ) const = 0;
+            virtual void fillOutgoingData( Json::Value& data ) const {}
+            virtual void handleResponseData( Json::Value const& data ) const {}
 
         private:
-            std::intmax_t callbackId_;
-            char const* action_;
+            char const* name_;
         };
 
         class LoginAction
                 : public Action
         {
         public:
-            using Callback = std::function< void ( char const* ) >;
+            using Callback = std::function< void () >;
 
-            LoginAction( std::intmax_t callbackId, std::string apikey, Callback callback );
+            LoginAction( std::string apikey, Callback callback );
 
         protected:
-            virtual void doHandle( Json::Value const& value ) const override;
-            virtual void doToJson( Json::Value& data ) const override;
+            virtual void fillOutgoingData( Json::Value& data ) const override;
+            virtual void handleResponseData( Json::Value const& data ) const override;
 
         private:
             std::string apikey_;
+            Callback callback_;
+        };
+
+        class PrinterAction
+            : public Action
+        {
+        public:
+            PrinterAction( char const* name, std::string printer );
+
+            virtual Json::Value createOutgoing() const override;
+
+        private:
+            std::string printer_;
+        };
+
+        class ListModelGroupsAction
+                : public PrinterAction
+        {
+        public:
+            using Callback = std::function< void ( std::vector< std::string > ) >;
+
+            ListModelGroupsAction( std::string printer, Callback callback );
+
+        protected:
+            virtual void handleResponseData( Json::Value const& data ) const override;
+
+        private:
             Callback callback_;
         };
 

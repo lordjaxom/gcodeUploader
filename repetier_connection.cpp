@@ -1,5 +1,7 @@
 #include <functional>
+#include <sstream>
 #include <system_error>
+#include <utility>
 
 #include <json/json.h>
 
@@ -11,11 +13,26 @@ using namespace std::placeholders;
 namespace gcu {
     namespace repetier {
 
-        Connection::Connection( std::string const& url, std::string const& apikey, wsclient& client )
-            : client_( client )
+        static std::string buildUrl( std::string const& hostname, std::uint16_t port, std::string const& resource )
+        {
+            std::ostringstream os;
+            os << "ws://" << hostname << ':' << port;
+            if ( !resource.empty() && resource.front() != '/' ) {
+                os << '/';
+            }
+            os << resource;
+            return os.str();
+        }
+
+        Connection::Connection( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback, wsclient& client )
+            : hostname_( std::move( hostname ) )
+            , port_( port )
+            , callback_( std::move( callback ) )
+            , client_( client )
             , apikey_( apikey )
         {
-            std::cout << "connecting to RepetierServer at " << url << "\n";
+            std::string url = buildUrl( hostname_, port_, "/socket" );
+            std::cerr << "INFO: Connecting to " << url << "\n";
 
             std::error_code ec;
             auto connection = client_.get_connection( url, ec );
@@ -40,36 +57,50 @@ namespace gcu {
 
         void Connection::handleOpen()
         {
-            status_ = OPEN;
-            send( factory_.createAction< LoginAction >( apikey_, []( char const* session ) { std::cout << "YAY! got session: " << session << "\n"; } ) );
+            callback_( status_ = Status::AUTHORIZING );
+            takeAction( std::make_unique< LoginAction >( apikey_, [this] {
+                callback_( status_ = Status::CONNECTED );
+                std::cerr << "INFO: Connection established\n";
+            } ), Status::AUTHORIZING );
         }
 
         void Connection::handleFail()
         {
-            status_ = FAILED;
+            callback_( status_ = Status::FAILED );
             auto connection = client_.get_con_from_hdl( handle_ );
-            std::cout << "FAIL: " << connection->get_ec().message();
+            std::cerr << "ERROR: Connection has failed: " << connection->get_ec().message() << "\n";
         }
 
         void Connection::handleClose()
         {
-            status_ = CLOSED;
+            callback_( status_ = Status::CLOSED );
             auto connection = client_.get_con_from_hdl( handle_ );
-            std::cout << "CLOSE: code " << websocketpp::close::status::get_string( connection->get_remote_close_code() )
+            std::cerr << "ERROR: Connection closed by server: code "
+                      << websocketpp::close::status::get_string( connection->get_remote_close_code() )
                       << ", reason: " << connection->get_remote_close_reason() << "\n";
         }
 
         void Connection::handleMessage( wsclient::message_ptr message )
         {
-            // std::cout << "<<< " << message->get_payload() << std::endl;
-            factory_.handleMessage( message->get_payload() );
+            auto incoming = jsonContext_.toJson( message->get_payload() );
+            if ( incoming[ "callback_id" ].asLargestInt() != -1 ) {
+                std::cerr << "<<< " << message->get_payload() << "\n";
+            }
+            collator_.handleIncoming( incoming );
         }
 
-        void Connection::send( Action const* action )
+        void Connection::takeAction( std::unique_ptr< Action > action, Status allowed )
         {
+            if ( status_ != allowed ) {
+                throw std::runtime_error( "connection not ready" );
+            }
+
+            auto outgoing = action->createOutgoing();
+            collator_.trackOutgoing( outgoing, std::move( action ));
+
+            auto payload = jsonContext_.toString( outgoing );
+            std::cerr << ">>> " << payload << "\n";
             auto connection = client_.get_con_from_hdl( handle_ );
-            auto payload = factory_.toString( action );
-            // std::cout << ">>> " << payload << "\n";
             connection->send( payload, websocketpp::frame::opcode::text );
         }
 

@@ -17,10 +17,12 @@ set(SOURCE_FILES
         repetier_definitions.hpp
         repetier_connection.cpp
         repetier_connection.hpp
-        repetier_conversation.cpp
-        repetier_conversation.hpp
+        repetier_collator.cpp
+        repetier_collator.hpp
         repetier_action.cpp
-        repetier_action.hpp)
+        repetier_action.hpp
+        json.cpp
+        json.hpp)
 
 set(CMAKE_CXX_STANDARD 14)
 

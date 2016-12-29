@@ -7,6 +7,17 @@
 namespace gcu {
     namespace repetier {
 
+        enum class Status : unsigned
+        {
+            CONNECTING,
+            AUTHORIZING,
+            CONNECTED,
+            CLOSED,
+            FAILED
+        };
+
+        using StatusCallback = std::function< void ( Status ) >;
+
         using wsclient = websocketpp::client<websocketpp::config::asio_client>;
 
     } // namespace repetier

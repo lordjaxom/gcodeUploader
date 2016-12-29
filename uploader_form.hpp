@@ -4,6 +4,7 @@
 #include <nana/gui/place.hpp>
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/checkbox.hpp>
+#include <nana/gui/widgets/combox.hpp>
 #include <nana/gui/widgets/form.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/textbox.hpp>
@@ -26,6 +27,8 @@ namespace gcu {
         nana::textbox fileNameTextbox_ { *this };
         nana::label modelNameLabel_ { *this, "Model name:" };
         nana::textbox modelNameTextbox_ { *this };
+        nana::label modelGroupLabel_ { *this, "Model group: " };
+        nana::combox modelGroupCombox_ { *this, "Default" };
         nana::checkbox deleteFileCheckbox_ { *this, "Delete file after upload?" };
         nana::button uploadButton_ { *this, "Upload" };
     };

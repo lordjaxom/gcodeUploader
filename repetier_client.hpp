@@ -11,20 +11,23 @@
 namespace gcu {
     namespace repetier {
 
+        class Action;
         class Connection;
 
         class Client
         {
         public:
-            Client( std::string const& hostname, std::uint16_t port, std::string const& apikey );
-            Client( std::string const& hostname, std::uint16_t port, std::string const& apikey, asio::io_service* io_service );
+            Client( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback );
+            Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback );
             Client( Client const& ) = delete;
             ~Client();
+
+            void takeAction( std::unique_ptr< Action > action );
 
         private:
             Client();
 
-            void connect( std::string const& hostname, std::uint16_t port, std::string const& apikey );
+            void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback );
 
             std::thread io_thread_;
             wsclient client_;

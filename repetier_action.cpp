@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <sstream>
 #include <utility>
 
@@ -9,42 +10,70 @@
 namespace gcu {
     namespace repetier {
 
-        Action::Action( std::intmax_t callbackId, char const* action )
-            : callbackId_( callbackId )
-            , action_( action )
+        Action::Action( char const* name )
+            : name_( name )
         {
         }
 
         Action::~Action() = default;
 
-        void Action::handle( Json::Value const& value ) const
+        Json::Value Action::createOutgoing() const
         {
-            doHandle( value );
+            Json::Value outgoing( Json::objectValue );
+            outgoing[ "action" ] = Json::StaticString( name_ );
+            fillOutgoingData( outgoing["data"] = Json::objectValue );
+            return outgoing;
         }
 
-        void Action::toJson( Json::Value& value ) const
+        void Action::handleResponse( Json::Value const& response ) const
         {
-            value = Json::objectValue;
-            value[ "callback_id" ] = callbackId_;
-            value[ "action" ] = Json::StaticString( action_ );
-            doToJson( value[ "data" ] = Json::objectValue );
+            handleResponseData( response[ "data" ] );
         }
 
-        LoginAction::LoginAction( std::intmax_t callbackId, std::string apikey, Callback callback )
-            : Action( callbackId, "login" )
+        LoginAction::LoginAction( std::string apikey, Callback callback )
+            : Action( "login" )
             , apikey_( std::move( apikey ) )
             , callback_( std::move( callback ) )
         {
         }
 
-        void LoginAction::doHandle( Json::Value const& value ) const
-        {
-            callback_( value[ "session" ].asCString() );
-        }
-
-        void LoginAction::doToJson( Json::Value& data ) const
+        void LoginAction::fillOutgoingData( Json::Value& data ) const
         {
             data[ "apikey" ] = Json::StaticString( apikey_.c_str() );
+        }
+
+        void LoginAction::handleResponseData( Json::Value const& data ) const
+        {
+            callback_();
+        }
+
+        PrinterAction::PrinterAction( char const* name, std::string printer )
+                : Action( name )
+                , printer_( std::move( printer ) )
+        {
+        }
+
+        Json::Value PrinterAction::createOutgoing() const
+        {
+            auto outgoing = Action::createOutgoing();
+            outgoing[ "printer" ] = Json::StaticString( printer_.c_str() );
+            return outgoing;
+        }
+
+        ListModelGroupsAction::ListModelGroupsAction( std::string printer, Callback callback )
+                : PrinterAction( "listModelGroups", std::move( printer ) )
+                , callback_( std::move( callback ) )
+        {
+        }
+
+        void ListModelGroupsAction::handleResponseData( Json::Value const& data ) const
+        {
+            auto const& groupNames = data[ "groupNames" ];
+            std::vector< std::string > result( groupNames.size() );
+            std::transform(
+                    groupNames.begin(), groupNames.end(), result.begin(),
+                    []( auto const& value ) { return value.asString(); } );
+            callback_( std::move( result ) );
         }
 
     } // namespace repetier

@@ -5,7 +5,8 @@
 #include <memory>
 #include <string>
 
-#include "repetier_conversation.hpp"
+#include "json.hpp"
+#include "repetier_collator.hpp"
 #include "repetier_definitions.hpp"
 
 namespace gcu {
@@ -13,18 +14,14 @@ namespace gcu {
 
         class Connection
         {
-            enum Status
-            {
-                CONNECTING,
-                OPEN,
-                FAILED,
-                CLOSED
-            };
-
         public:
-            Connection( std::string const& url, std::string const& apikey, wsclient& client );
+            Connection( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback, wsclient& client );
             Connection( Connection const& ) = delete;
             ~Connection();
+
+            Status status() const { return status_; }
+
+            void takeAction( std::unique_ptr< Action > action, Status allowed = Status::CONNECTED );
 
         private:
             void handleOpen();
@@ -32,14 +29,16 @@ namespace gcu {
             void handleClose();
             void handleMessage( wsclient::message_ptr message );
 
-            void send( Action const* action );
-
-            std::string const& apikey_;
             wsclient& client_;
+            std::string hostname_;
+            std::uint16_t port_;
+            std::string apikey_;
+            StatusCallback callback_;
             websocketpp::connection_hdl handle_;
-            ConversationFactory factory_;
+            JsonContext jsonContext_;
+            Collator collator_;
 
-            Status status_ { CONNECTING };
+            Status status_ { Status::CONNECTING };
         };
 
     } // namespace repetier
