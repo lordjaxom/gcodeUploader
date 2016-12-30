@@ -2,7 +2,6 @@
 #define GCODEUPLOADER_REPETIER_HPP
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 
@@ -31,7 +30,7 @@ namespace gcu {
         ~RepetierApi();
 
         void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback  );
-        void connect( std::string hostname, std::uint16_t port, std::string apikey  );
+        repetier::Status connect( std::string hostname, std::uint16_t port, std::string apikey  );
 
         void listModelGroups( std::string printer, repetier::ListModelGroupsAction::Callback callback );
         std::vector< std::string > listModelGroups( std::string printer );

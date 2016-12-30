@@ -28,7 +28,11 @@ namespace gcu {
             client_.set_error_channels( websocketpp::log::elevel::none );
         }
 
-        Client::~Client() = default;
+        Client::~Client()
+        {
+            std::cerr << "joining thread\n";
+            io_thread_.join();
+        }
 
         void Client::connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback )
         {

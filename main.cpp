@@ -11,6 +11,7 @@ int main( int argc, char const* const argv[] )
         gcu::UploaderForm form;
         form.show();
         nana::exec();
+        std::cerr << "left nana exec loop\n";
     }
     catch ( std::exception const& e ) {
         std::cerr << "unexpected exception: " << e.what() << "\n";
