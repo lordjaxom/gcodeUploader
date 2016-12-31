@@ -15,13 +15,14 @@ namespace gcu {
         class Connection
         {
         public:
-            Connection( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback, wsclient& client );
+            Connection( wsclient& client, std::string const& hostname, std::uint16_t port, std::string const& apikey,
+                        ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
             Connection( Connection const& ) = delete;
             ~Connection();
 
-            Status status() const { return status_; }
+            bool connected() const { return connected_; }
 
-            void takeAction( std::unique_ptr< Action > action, Status allowed = Status::CONNECTED );
+            void takeAction( std::unique_ptr< Action > action );
 
         private:
             void handleOpen();
@@ -29,16 +30,18 @@ namespace gcu {
             void handleClose();
             void handleMessage( wsclient::message_ptr message );
 
+            void takeAction( std::unique_ptr< Action > action, bool connectedOnly );
+
             wsclient& client_;
-            std::string hostname_;
-            std::uint16_t port_;
-            std::string apikey_;
-            StatusCallback callback_;
+            std::string const& apikey_;
+            ConnectCallback connectCallback_;
+            CloseCallback closeCallback_;
+            ErrorCallback errorCallback_;
             websocketpp::connection_hdl handle_;
             JsonContext jsonContext_;
             Collator collator_;
 
-            Status status_ { Status::CONNECTING };
+            bool connected_ {};
         };
 
     } // namespace repetier

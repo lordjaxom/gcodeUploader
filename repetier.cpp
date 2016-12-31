@@ -1,3 +1,4 @@
+#include <functional>
 #include <future>
 #include <utility>
 
@@ -17,8 +18,8 @@ namespace gcu {
     {
         std::promise< Result > promise;
         auto future = promise.get_future();
-        std::forward< Func >( func )( [&promise]( Result result ) {
-            promise.set_value( std::move( result ) );
+        std::forward< Func >( func )( [&]( Result result ) {
+            promise.set_value( result );
         } );
         return future.get();
     }
@@ -35,32 +36,27 @@ namespace gcu {
 
     RepetierApi::~RepetierApi() = default;
 
-    void RepetierApi::connect( std::string hostname, uint16_t port, std::string apikey, repetier::StatusCallback callback )
+    void RepetierApi::connect( std::string hostname, uint16_t port, std::string apikey, bool wait )
     {
+        if ( wait ) {
+            throw std::invalid_argument( "not implemented" );
+        }
+
+        using namespace std::placeholders;
+
         if ( client_ ) {
             throw std::invalid_argument( "connection already in progress" );
         }
 
-        client_.reset( io_service_ ? new repetier::Client( *io_service_, std::move( hostname ), port, std::move( apikey ), std::move( callback ) )
-                                   : new repetier::Client( std::move( hostname ), port, std::move( apikey ), std::move( callback ) ) );
-    }
-
-    repetier::Status RepetierApi::connect( std::string hostname, unsigned short port, std::string apikey )
-    {
-
-        waitForAsyncCall< repetier::Status >( [&]( repetier::StatusCallback callback ) {
-            connect( hostname, port, apikey , std::move( callback ) );
-        } );
-        /*
-        std::promise< repetier::Status > pr omise;
-        auto future = promise.get_future();
-        connect( std::move( hostname ), port, std::move( apikey ), [&promise]( repetier::Status status ) {
-            if ( status == repetier::Status::CONNECTED ) {
-                promise.set_value( status );
-            }
-        } );
-        future.get();
-        */
+        client_.reset( io_service_
+               ? new repetier::Client( *io_service_, std::move( hostname ), port, std::move( apikey ),
+                                       std::bind( &RepetierApi::handleConnect, this ),
+                                       std::bind( &RepetierApi::handleClose, this, _1 ),
+                                       std::bind( &RepetierApi::handleError, this, _1 ) )
+               : new repetier::Client( std::move( hostname ), port, std::move( apikey ),
+                                       std::bind( &RepetierApi::handleConnect, this ),
+                                       std::bind( &RepetierApi::handleClose, this, _1 ),
+                                       std::bind( &RepetierApi::handleError, this, _1 ) ) );
     }
 
     void RepetierApi::listModelGroups( std::string printer, repetier::ListModelGroupsAction::Callback callback )
@@ -77,6 +73,33 @@ namespace gcu {
                 } );
         auto x = future.get();
         return x;
+    }
+
+    void RepetierApi::listPrinter( repetier::ListPrinterAction::Callback callback )
+    {
+        performAction< repetier::ListPrinterAction >( *client_, callback );
+    }
+
+    std::vector< repetier::Printer > RepetierApi::listPrinter()
+    {
+        return std::vector< repetier::Printer >();
+    }
+
+    void RepetierApi::handleConnect()
+    {
+        if ( connectCallback_ ) {
+            connectCallback_();
+        }
+    }
+
+    void RepetierApi::handleClose( std::string reason )
+    {
+
+    }
+
+    void RepetierApi::handleError( std::error_code ec )
+    {
+
     }
 
 } // namespace gcu

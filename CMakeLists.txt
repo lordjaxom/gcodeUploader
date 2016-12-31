@@ -22,7 +22,8 @@ set(SOURCE_FILES
         repetier_action.cpp
         repetier_action.hpp
         json.cpp
-        json.hpp)
+        json.hpp
+        repetier_definitions.cpp)
 
 set(CMAKE_CXX_STANDARD 14)
 

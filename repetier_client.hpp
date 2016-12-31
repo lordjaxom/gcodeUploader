@@ -17,8 +17,10 @@ namespace gcu {
         class Client
         {
         public:
-            Client( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback );
-            Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback );
+            Client( std::string hostname, std::uint16_t port, std::string apikey,
+                    ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
+            Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey,
+                    ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
             Client( Client const& ) = delete;
             ~Client();
 
@@ -27,8 +29,12 @@ namespace gcu {
         private:
             Client();
 
-            void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback );
+            void connect( std::string hostname, std::uint16_t port, std::string apikey,
+                          ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
 
+            std::string hostname_;
+            std::uint16_t port_;
+            std::string apikey_;
             std::thread io_thread_;
             wsclient client_;
             std::unique_ptr< Connection > connection_;

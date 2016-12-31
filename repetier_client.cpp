@@ -7,19 +7,23 @@
 namespace gcu {
     namespace repetier {
 
-        Client::Client( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback )
-                    : Client()
+        Client::Client( std::string hostname, std::uint16_t port, std::string apikey,
+                        ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback )
+            : Client()
         {
             client_.init_asio();
-            connect( std::move( hostname ), std::move( port ), std::move( apikey ), std::move( callback ) );
+            connect( std::move( hostname ), port, std::move( apikey ), std::move( connectCallback ),
+                     std::move( closeCallback ), std::move( errorCallback ) );
             io_thread_ = std::thread( [this] { client_.run(); } );
         }
 
-        Client::Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback )
-                : Client()
+        Client::Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey,
+                        ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback )
+            : Client()
         {
             client_.init_asio( &io_service );
-            connect( std::move( hostname ), std::move( port ), std::move( apikey ), std::move( callback ) );
+            connect( std::move( hostname ), port, std::move( apikey ), std::move( connectCallback ),
+                     std::move( closeCallback ), std::move( errorCallback ) );
         }
 
         Client::Client()
@@ -30,19 +34,35 @@ namespace gcu {
 
         Client::~Client()
         {
+            if ( connection_ ) {
+                std::cerr << "forcibly closing connection\n";
+                connection_.reset();
+            }
+
             std::cerr << "joining thread\n";
             io_thread_.join();
         }
 
-        void Client::connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback )
+        void Client::connect( std::string hostname, std::uint16_t port, std::string apikey,
+                              ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback )
         {
-            connection_.reset( new Connection( std::move( hostname ), std::move( port ), std::move( apikey ), std::move( callback ), client_ ));
+            if ( connection_ && connection_->connected() ) {
+                throw std::invalid_argument( "connection already established" );
+            }
+
+            hostname_ = std::move( hostname );
+            port_ = port;
+            apikey_ = std::move( apikey );
+
+            connection_.reset(
+                    new Connection( client_, hostname_, port_, apikey_, std::move( connectCallback ),
+                                    std::move( closeCallback ), std::move( errorCallback ) ) );
         }
 
         void Client::takeAction( std::unique_ptr< Action > action )
         {
             if ( !connection_ ) {
-                throw std::runtime_error( "connection not established" );
+                throw std::invalid_argument( "connection not established" );
             }
 
             connection_->takeAction( std::move( action ) );

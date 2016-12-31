@@ -29,15 +29,24 @@ namespace gcu {
         explicit RepetierApi( asio::io_service& io_service );
         ~RepetierApi();
 
-        void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback  );
-        repetier::Status connect( std::string hostname, std::uint16_t port, std::string apikey  );
+        void connectCallback( repetier::ConnectCallback callback ) { connectCallback_ = std::move( callback ); }
+
+        void connect( std::string hostname, std::uint16_t port, std::string apikey, bool wait = false );
 
         void listModelGroups( std::string printer, repetier::ListModelGroupsAction::Callback callback );
         std::vector< std::string > listModelGroups( std::string printer );
 
+        void listPrinter( repetier::ListPrinterAction::Callback callback );
+        std::vector< repetier::Printer > listPrinter();
+
     private:
+        void handleConnect();
+        void handleClose( std::string reason );
+        void handleError( std::error_code ec );
+
         asio::io_service* io_service_;
         std::unique_ptr< repetier::Client > client_;
+        repetier::ConnectCallback connectCallback_;
     };
 
 } // namespace gcu

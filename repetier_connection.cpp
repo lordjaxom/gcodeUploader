@@ -24,20 +24,23 @@ namespace gcu {
             return os.str();
         }
 
-        Connection::Connection( std::string hostname, std::uint16_t port, std::string apikey, repetier::StatusCallback callback, wsclient& client )
-            : hostname_( std::move( hostname ) )
-            , port_( port )
-            , callback_( std::move( callback ) )
-            , client_( client )
-            , apikey_( apikey )
+        Connection::Connection(
+                wsclient& client, std::string const& hostname, std::uint16_t port, std::string const& apikey,
+                ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback )
+            : client_( client )
+            , apikey_( std::move( apikey ) )
+            , connectCallback_( std::move( connectCallback ) )
+            , closeCallback_( std::move( closeCallback ) )
+            , errorCallback_( std::move( errorCallback ) )
         {
-            std::string url = buildUrl( hostname_, port_, "/socket" );
+            std::string url = buildUrl( hostname, port, "/socket" );
             std::cerr << "INFO: Connecting to " << url << "\n";
 
             std::error_code ec;
             auto connection = client_.get_connection( url, ec );
             if ( ec ) {
-                throw std::system_error( ec, "couldn't initialize connection: " + ec.message() );
+                errorCallback_( ec );
+                return;
             }
             handle_ = connection->get_handle();
 
@@ -57,24 +60,24 @@ namespace gcu {
 
         void Connection::handleOpen()
         {
-            callback_( status_ = Status::AUTHORIZING );
             takeAction( std::make_unique< LoginAction >( apikey_, [this] {
-                callback_( status_ = Status::CONNECTED );
+                connected_ = true;
+                connectCallback_();
                 std::cerr << "INFO: Connection established\n";
-            } ), Status::AUTHORIZING );
+            } ), false );
         }
 
         void Connection::handleFail()
         {
-            callback_( status_ = Status::FAILED );
             auto connection = client_.get_con_from_hdl( handle_ );
+            errorCallback_( connection->get_ec() );
             std::cerr << "ERROR: Connection has failed: " << connection->get_ec().message() << "\n";
         }
 
         void Connection::handleClose()
         {
-            callback_( status_ = Status::CLOSED );
             auto connection = client_.get_con_from_hdl( handle_ );
+            closeCallback_( connection->get_remote_close_reason() );
             std::cerr << "ERROR: Connection closed by server: code "
                       << websocketpp::close::status::get_string( connection->get_remote_close_code() )
                       << ", reason: " << connection->get_remote_close_reason() << "\n";
@@ -89,10 +92,15 @@ namespace gcu {
             collator_.handleIncoming( incoming );
         }
 
-        void Connection::takeAction( std::unique_ptr< Action > action, Status allowed )
+        void Connection::takeAction( std::unique_ptr< Action > action )
         {
-            if ( status_ != allowed ) {
-                throw std::runtime_error( "connection not ready" );
+            takeAction( std::move( action ), true );
+        }
+
+        void Connection::takeAction( std::unique_ptr< Action > action, bool connectedOnly )
+        {
+            if ( connectedOnly && !connected_ ) {
+                throw std::invalid_argument( "connection not ready" );
             }
 
             auto outgoing = action->createOutgoing();

@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "repetier_definitions.hpp"
+
 namespace Json {
     class Value;
 } // namespace Json
@@ -46,6 +48,21 @@ namespace gcu {
 
         private:
             std::string apikey_;
+            Callback callback_;
+        };
+
+        class ListPrinterAction
+                : public Action
+        {
+        public:
+            using Callback = std::function< void ( std::vector< Printer > ) >;
+
+            ListPrinterAction( Callback callback );
+
+        protected:
+            virtual void handleResponseData( Json::Value const& data ) const override;
+
+        private:
             Callback callback_;
         };
 

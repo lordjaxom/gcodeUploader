@@ -8,8 +8,6 @@ namespace gcu {
     UploaderForm::UploaderForm()
         : form( nana::API::make_center( 400, 150 ), nana::appear::decorate<>() )
     {
-        api_.connect( "makermac", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47" );
-
         caption( "G-Code Uploader" );
 
         fileNameLabel_.text_align( nana::align::left, nana::align_v::center );
@@ -17,11 +15,6 @@ namespace gcu {
         modelNameLabel_.text_align( nana::align::left, nana::align_v::center );
         modelGroupLabel_.text_align( nana::align::left, nana::align_v::center );
         modelGroupCombox_.editable( true );
-
-        std::cerr << "listing model groups\n";
-        for ( auto const& group : api_.listModelGroups( "Replicator" ) ) {
-            modelGroupCombox_.push_back( group );
-        }
 
         uploadButton_.events().click( [this] {
 
@@ -44,6 +37,23 @@ namespace gcu {
         place_[ "deleteFile" ] << deleteFileCheckbox_;
         place_[ "buttons" ] << uploadButton_;
         place_.collocate();
+
+        api_.connectCallback( [this] {
+            api_.listPrinter( [this] ( std::vector< repetier::Printer > printers ) {
+                for ( auto const& printer : printers ) {
+                    std::cout << "Printer: " << printer.name() << "\n";
+                }
+
+                if ( !printers.empty() ) {
+                    api_.listModelGroups( printers[ 0 ].slug(), [this] ( std::vector< std::string > modelGroups ) {
+                        for ( auto const& group : api_.listModelGroups( "Replicator" ) ) {
+                            modelGroupCombox_.push_back( group );
+                        }
+                    } );
+                }
+            } );
+        } );
+        api_.connect( "makermac", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47" );
     }
 
 } // namespace gcu

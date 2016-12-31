@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iterator>
 #include <sstream>
 #include <utility>
 
@@ -45,6 +46,23 @@ namespace gcu {
         void LoginAction::handleResponseData( Json::Value const& data ) const
         {
             callback_();
+        }
+
+        ListPrinterAction::ListPrinterAction( ListPrinterAction::Callback callback )
+                : Action( "listPrinter" )
+                , callback_( std::move( callback ) )
+        {
+        }
+
+        void ListPrinterAction::handleResponseData( Json::Value const& data ) const
+        {
+            std::vector< Printer > result;
+            std::transform(
+                    data.begin(), data.end(), std::back_inserter( result ),
+                    []( auto const& value ) {
+                        return Printer( value[ "active" ].asBool(), value[ "name" ].asString(), value[ "slug" ].asString() );
+                    } );
+            callback_( result );
         }
 
         PrinterAction::PrinterAction( char const* name, std::string printer )
