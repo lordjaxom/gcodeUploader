@@ -14,7 +14,11 @@ namespace gcu {
             client_.init_asio();
             connect( std::move( hostname ), port, std::move( apikey ), std::move( connectCallback ),
                      std::move( closeCallback ), std::move( errorCallback ) );
-            io_thread_ = std::thread( [this] { client_.run(); } );
+            io_thread_ = std::thread( [this] {
+                std::cerr << "starting io thread\n";
+                client_.run();
+                std::cerr << "stopping io thread\n";
+            } );
         }
 
         Client::Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey,

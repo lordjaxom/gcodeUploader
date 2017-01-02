@@ -40,20 +40,16 @@ namespace gcu {
 
         api_.connectCallback( [this] {
             api_.listPrinter( [this] ( std::vector< repetier::Printer > printers ) {
-                for ( auto const& printer : printers ) {
-                    std::cout << "Printer: " << printer.name() << "\n";
-                }
-
                 if ( !printers.empty() ) {
                     api_.listModelGroups( printers[ 0 ].slug(), [this] ( std::vector< std::string > modelGroups ) {
-                        for ( auto const& group : api_.listModelGroups( "Replicator" ) ) {
+                        for ( auto const& group : modelGroups ) {
                             modelGroupCombox_.push_back( group );
                         }
                     } );
                 }
             } );
         } );
-        api_.connect( "makermac", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47" );
+        api_.connect( "192.168.178.70", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47" );
     }
 
 } // namespace gcu

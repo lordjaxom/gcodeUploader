@@ -55,6 +55,7 @@ namespace gcu {
         Connection::~Connection()
         {
             std::error_code ec;
+            std::cerr << "sending websocket close\n";
             client_.close( handle_, websocketpp::close::status::going_away, "", ec );
         }
 

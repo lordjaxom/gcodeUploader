@@ -39,9 +39,7 @@ find_path(websocketpp_INCLUDE_DIRS websocketpp/client.hpp HINTS ${websocketpp_RO
 set(websocketpp_DEFINITIONS _WEBSOCKETPP_CPP11_THREAD_)
 
 find_path(jsoncpp_INCLUDE_DIRS json/json.h HINTS ${JSONCPP_ROOT}/include)
-find_library(jsoncpp_LIBRARIES NAMES jsoncpp libjsoncpp HINTS ${JSONCPP_ROOT})
-
-message("json include: ${jsoncpp_INCLUDE_DIRS}")
+find_library(jsoncpp_LIBRARIES NAMES jsoncpp libjsoncpp HINTS ${JSONCPP_ROOT}/src/lib_json)
 
 add_executable(gcodeUploader ${SOURCE_FILES})
 target_compile_definitions(gcodeUploader PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
