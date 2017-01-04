@@ -5,11 +5,10 @@
 #include <stdexcept>
 #include <string>
 
-#include <json/value.h>
-
 namespace Json {
     class CharReader;
     class StreamWriter;
+    class Value;
 } // namespace Json
 
 namespace gcu {

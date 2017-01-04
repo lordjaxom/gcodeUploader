@@ -38,6 +38,11 @@ namespace gcu {
         place_[ "buttons" ] << uploadButton_;
         place_.collocate();
 
+        client_.connect( "192.168.178.70", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47", []( std::error_condition ec ) {
+
+        } );
+
+        /*
         api_.connectCallback( [this] {
             api_.listPrinter( [this] ( std::vector< repetier::Printer > printers ) {
                 if ( !printers.empty() ) {
@@ -50,6 +55,7 @@ namespace gcu {
             } );
         } );
         api_.connect( "192.168.178.70", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47" );
+        */
     }
 
 } // namespace gcu

@@ -5,39 +5,48 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
+#include <websocketpp/config/asio_no_tls_client.hpp>
+#include <websocketpp/client.hpp>
+
+#include "json.hpp"
 #include "repetier_definitions.hpp"
 
 namespace gcu {
     namespace repetier {
 
-        class Action;
-        class Connection;
+        using wsclient = websocketpp::client<websocketpp::config::asio_client>;
 
         class Client
         {
+            using ActionHandler = std::function< void( Json::Value&& response ) >;
+
         public:
-            Client( std::string hostname, std::uint16_t port, std::string apikey,
-                    ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
-            Client( asio::io_service& io_service, std::string hostname, std::uint16_t port, std::string apikey,
-                    ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
+            Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, ConnectCallback&& callback );
             Client( Client const& ) = delete;
             ~Client();
 
-            void takeAction( std::unique_ptr< Action > action );
-
         private:
-            Client();
+            void handleOpen();
+            void handleFail();
+            void handleClose();
+            void handleMessage( wsclient::message_ptr message );
 
-            void connect( std::string hostname, std::uint16_t port, std::string apikey,
-                          ConnectCallback connectCallback, CloseCallback closeCallback, ErrorCallback errorCallback );
+            void sendActionRequest( std::string&& action, Json::Value&& data, ActionHandler&& callback );
+            void handleActionResponse( );
 
             std::string hostname_;
             std::uint16_t port_;
             std::string apikey_;
-            std::thread io_thread_;
+            ConnectCallback callback_;
             wsclient client_;
-            std::unique_ptr< Connection > connection_;
+            websocketpp::connection_hdl handle_;
+            std::thread thread_;
+            std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
+            JsonContext jsonContext_;
+
+            std::intmax_t nextCallbackId_ {};
         };
 
     } // namespace repetier

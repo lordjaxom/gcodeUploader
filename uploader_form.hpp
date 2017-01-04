@@ -20,7 +20,7 @@ namespace gcu {
         UploaderForm();
 
     private:
-        RepetierApi api_;
+        RepetierClient client_;
 
         nana::place place_ { *this };
         nana::label fileNameLabel_ { *this, "G-Code file:" };

@@ -7,23 +7,17 @@ include(CMakeLocal.cmake)
 
 set(SOURCE_FILES
         main.cpp
-        uploader_form.cpp
-        uploader_form.hpp
-        repetier_client.cpp
-        repetier_client.hpp
-        resource.rc
-        repetier.cpp
-        repetier.hpp
-        repetier_definitions.hpp
-        repetier_connection.cpp
-        repetier_connection.hpp
-        repetier_collator.cpp
-        repetier_collator.hpp
-        repetier_action.cpp
-        repetier_action.hpp
         json.cpp
         json.hpp
-        repetier_definitions.cpp)
+        uploader_form.cpp
+        uploader_form.hpp
+        repetier.cpp
+        repetier.hpp
+        repetier_client.cpp
+        repetier_client.hpp
+        repetier_definitions.hpp
+        repetier_definitions.cpp
+        resource.rc)
 
 set(CMAKE_CXX_STANDARD 14)
 

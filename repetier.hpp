@@ -5,10 +5,6 @@
 #include <memory>
 #include <string>
 
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <websocketpp/client.hpp>
-
-#include "repetier_action.hpp"
 #include "repetier_definitions.hpp"
 
 namespace asio {
@@ -21,32 +17,20 @@ namespace gcu {
         class Client;
     } // namespace repetier
 
-    class RepetierApi
+    class RepetierClient
     {
     public:
-        RepetierApi();
-        RepetierApi( RepetierApi const& ) = delete;
-        explicit RepetierApi( asio::io_service& io_service );
-        ~RepetierApi();
+        RepetierClient();
+        RepetierClient( RepetierClient const& ) = delete;
+        ~RepetierClient();
 
-        void connectCallback( repetier::ConnectCallback callback ) { connectCallback_ = std::move( callback ); }
-
-        void connect( std::string hostname, std::uint16_t port, std::string apikey, bool wait = false );
-
-        void listModelGroups( std::string printer, repetier::ListModelGroupsAction::Callback callback );
-        std::vector< std::string > listModelGroups( std::string printer );
-
-        void listPrinter( repetier::ListPrinterAction::Callback callback );
-        std::vector< repetier::Printer > listPrinter();
+        void connect(
+                std::string hostname, std::uint16_t port, std::string apikey, repetier::ConnectCallback callback );
+        //void listModelGroups( std::string printer, repetier::ListModelGroupsAction::Callback callback );
+        //void listPrinter( repetier::ListPrinterAction::Callback callback );
 
     private:
-        void handleConnect();
-        void handleClose( std::string reason );
-        void handleError( std::error_code ec );
-
-        asio::io_service* io_service_;
         std::unique_ptr< repetier::Client > client_;
-        repetier::ConnectCallback connectCallback_;
     };
 
 } // namespace gcu

@@ -19,5 +19,4 @@ int main( int argc, char const* const argv[] )
     catch ( ... ) {
         std::cerr << "what?!\n";
     }
-    abort();
 }

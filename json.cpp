@@ -2,6 +2,7 @@
 #include <utility>
 
 #include <json/reader.h>
+#include <json/value.h>
 #include <json/writer.h>
 
 #include "json.hpp"
