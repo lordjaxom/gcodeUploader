@@ -8,15 +8,24 @@
 int main( int argc, char const* const argv[] )
 {
     try {
-        gcu::UploaderForm form;
+        if ( argc != 2 ) {
+            nana::msgbox msgbox( nullptr, "Error", nana::msgbox::ok );
+            msgbox.icon( nana::msgbox::icon_error );
+            msgbox << "Usage: " << argv[ 0 ] << " FILE";
+            msgbox.show();
+            return EXIT_FAILURE;
+        }
+
+        gcu::UploaderForm form( argv[ 1 ] );
         form.show();
         nana::exec();
-        std::cerr << "left nana exec loop\n";
+
+        std::cerr << "INFO: Exiting regularly\n";
     }
     catch ( std::exception const& e ) {
-        std::cerr << "unexpected exception: " << e.what() << "\n";
+        std::cerr << "ERROR: unexpected exception: " << e.what() << "\n";
     }
     catch ( ... ) {
-        std::cerr << "what?!\n";
+        std::cerr << "ERROR: what?!\n";
     }
 }

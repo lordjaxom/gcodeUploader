@@ -4,11 +4,10 @@
 #include <functional>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace gcu {
     namespace repetier {
-
-        using ConnectCallback = std::function< void ( std::error_condition ec ) >;
 
         class Printer
         {
@@ -24,6 +23,10 @@ namespace gcu {
             std::string name_;
             std::string slug_;
         };
+
+        using ConnectCallback = std::function< void ( std::error_code ec ) >;
+        using ListPrinterCallback = std::function< void ( std::vector< Printer >&& printers, std::error_code ec ) >;
+        using ListModelGroupsCallback = std::function< void ( std::vector< std::string >&& modelGroups, std::error_code ec ) >;
 
     } // namespace repetier
 } // namespace gcu

@@ -16,16 +16,29 @@
 namespace gcu {
     namespace repetier {
 
-        using wsclient = websocketpp::client<websocketpp::config::asio_client>;
-
         class Client
         {
-            using ActionHandler = std::function< void( Json::Value&& response ) >;
+            using wsclient = websocketpp::client<websocketpp::config::asio_client>;
+
+            using ActionHandler = std::function< void( Json::Value&& data ) >;
+
+            enum Status
+            {
+                CONNECTING,
+                CONNECTED,
+                CLOSING,
+                CLOSED
+            };
 
         public:
             Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, ConnectCallback&& callback );
             Client( Client const& ) = delete;
             ~Client();
+
+            bool connected() const { return status_ == CONNECTED; }
+
+            void sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,
+                                    ActionHandler&& handler );
 
         private:
             void handleOpen();
@@ -33,8 +46,10 @@ namespace gcu {
             void handleClose();
             void handleMessage( wsclient::message_ptr message );
 
-            void sendActionRequest( std::string&& action, Json::Value&& data, ActionHandler&& callback );
-            void handleActionResponse( );
+            void close( websocketpp::close::status::value code );
+            void forceClose();
+
+            void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
 
             std::string hostname_;
             std::uint16_t port_;
@@ -46,6 +61,7 @@ namespace gcu {
             std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
             JsonContext jsonContext_;
 
+            Status status_ { CONNECTING };
             std::intmax_t nextCallbackId_ {};
         };
 

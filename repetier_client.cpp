@@ -1,7 +1,8 @@
 #include <functional>
 #include <sstream>
 #include <utility>
-#include <json/json.h>
+
+#include <json/value.h>
 
 #include "repetier_client.hpp"
 
@@ -51,19 +52,26 @@ namespace gcu {
 
         Client::~Client()
         {
-            std::error_code ec;
-            client_.close( handle_, websocketpp::close::status::going_away, "", ec );
+            close( websocketpp::close::status::normal );
             thread_.join();
         }
 
         void Client::handleOpen()
         {
             std::cerr << "INFO: Connection established, logging in\n";
-
             Json::Value data = Json::objectValue;
             data[ Json::StaticString( "apikey" ) ] = Json::StaticString( apikey_.c_str() );
-            sendActionRequest( "login", std::move( data ), []( Json::Value&& ) {
-
+            sendActionRequest( "login", "", std::move( data ), [this]( Json::Value&& data ) {
+                if ( data[ Json::StaticString( "ok" ) ].asBool() ) {
+                    std::cerr << "INFO: Login successful, connection completed\n";
+                    status_ = CONNECTED;
+                    callback_( {} );
+                }
+                else {
+                    std::cerr << "ERROR: Login failed, closing connection\n";
+                    close( websocketpp::close::status::going_away );
+                    callback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
+                }
             } );
         }
 
@@ -71,32 +79,60 @@ namespace gcu {
         {
             auto connection = client_.get_con_from_hdl( handle_ );
             std::cerr << "ERROR: Connection has failed: " << connection->get_ec().message() << "\n";
+            callback_( connection->get_ec() );
+            forceClose();
         }
 
         void Client::handleClose()
         {
-            auto connection = client_.get_con_from_hdl( handle_ );
-            std::cerr << "ERROR: Connection closed by server: code "
-                      << websocketpp::close::status::get_string( connection->get_remote_close_code() )
-                      << ", reason: " << connection->get_remote_close_reason() << "\n";
+            if ( status_ != CLOSING ) {
+                auto connection = client_.get_con_from_hdl( handle_ );
+                std::cerr << "ERROR: Connection closed by server: code "
+                          << websocketpp::close::status::get_string( connection->get_remote_close_code())
+                          << ", reason: " << connection->get_remote_close_reason() << "\n";
+                callback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
+            }
+            status_ = CLOSED;
         }
 
         void Client::handleMessage( wsclient::message_ptr message )
         {
-            auto incoming = jsonContext_.toJson( message->get_payload() );
-            if ( incoming[ "callback_id" ].asLargestInt() != -1 ) {
-
+            auto response = jsonContext_.toJson( message->get_payload() );
+            auto callbackId = response[ Json::StaticString( "callback_id" ) ].asLargestInt();
+            if ( callbackId != -1 ) {
                 std::cerr << "<<< " << message->get_payload() << "\n";
+                handleActionResponse( callbackId, std::move( response ) );
             }
-            // collator_.handleIncoming( incoming );
         }
 
-        void Client::sendActionRequest( std::string&& action, Json::Value&& data, ActionHandler&& callback )
+        void Client::close( websocketpp::close::status::value code )
+        {
+            status_ = CLOSING;
+
+            std::error_code ec;
+            client_.close( handle_, code, {}, ec );
+            if ( ec ) {
+                std::cerr << "WARN: Closing connection normally failed, close forced: " << ec.message() << "\n";
+                forceClose();
+            }
+        }
+
+        void Client::forceClose()
+        {
+            status_ = CLOSED;
+
+            std::error_code ec;
+            client_.close( handle_, websocketpp::close::status::force_tcp_drop, {}, ec );
+        }
+
+        void Client::sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,
+                                        ActionHandler&& handler )
         {
             auto callbackId = ++nextCallbackId_;
 
             Json::Value request = Json::objectValue;
-            request[ Json::StaticString( "action" ) ] = std::move( action );
+            request[ Json::StaticString( "action" ) ] = Json::StaticString( action.c_str() );
+            request[ Json::StaticString( "printer" ) ] = Json::StaticString( printer.c_str() );
             request[ Json::StaticString( "callback_id" ) ] = callbackId;
             request[ Json::StaticString( "data" ) ] = std::move( data );
 
@@ -105,7 +141,20 @@ namespace gcu {
 
             auto connection = client_.get_con_from_hdl( handle_ );
             connection->send( message, websocketpp::frame::opcode::text );
-            actionHandlers_.emplace( callbackId, std::move( callback ) );
+            actionHandlers_.emplace( callbackId, std::move( handler ) );
+        }
+
+        void Client::handleActionResponse( std::intmax_t callbackId, Json::Value&& response )
+        {
+            auto it = actionHandlers_.find( callbackId );
+            if ( it == actionHandlers_.end() ) {
+                std::cerr << "WARN: Received response to unrequested callback " << callbackId << ", ignoring message\n";
+                return;
+            }
+
+            auto handler = std::move( it->second );
+            actionHandlers_.erase( it );
+            handler( std::move( response[ Json::StaticString( "data" ) ] ) );
         }
 
     } // namespace repetier

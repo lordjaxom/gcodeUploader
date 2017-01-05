@@ -1,11 +1,23 @@
+#include <algorithm>
 #include <functional>
-#include <future>
+#include <iterator>
 #include <utility>
+
+#include <json/value.h>
 
 #include "repetier.hpp"
 #include "repetier_client.hpp"
 
 namespace gcu {
+
+    template< typename Client, typename... Args >
+    static void sendActionRequest( Client& client, Args&&... args )
+    {
+        if ( !client || !client->connected() ) {
+            throw std::invalid_argument( "connection not established" );
+        }
+        client->sendActionRequest( std::forward< Args >( args )... );
+    }
 
     RepetierClient::RepetierClient() = default;
     RepetierClient::~RepetierClient() = default;
@@ -21,48 +33,36 @@ namespace gcu {
                 new repetier::Client( std::move( hostname ), port, std::move( apikey ), std::move( callback ) ) );
     }
 
-    /*
-    void RepetierClient::listModelGroups( std::string printer, repetier::ListModelGroupsAction::Callback callback )
+    void RepetierClient::listPrinter( repetier::ListPrinterCallback callback )
     {
-        performAction< repetier::ListModelGroupsAction >( *client_, std::move( printer ), callback );
+        sendActionRequest( client_, "listPrinter", "", Json::objectValue, [callback]( auto&& data ) {
+            std::vector< repetier::Printer > result;
+            std::transform( data.begin(), data.end(), std::back_inserter( result ),
+                            []( auto const& printer ) {
+                                return repetier::Printer( printer[ Json::StaticString( "active" ) ].asBool(),
+                                                          printer[ Json::StaticString( "name" ) ].asString(),
+                                                          printer[ Json::StaticString( "slug" ) ].asString() );
+                            } );
+            callback( std::move( result ), {} );
+        } );
     }
 
-    std::vector< std::string > RepetierClient::listModelGroups( std::string printer )
+    void RepetierClient::listModelGroups( std::string const& printer, repetier::ListModelGroupsCallback callback )
     {
-        std::promise< std::vector< std::string > > promise;
-        auto future = promise.get_future();
-        listModelGroups( std::move( printer ), [&promise]( std::vector< std::string > groups ) {
-                    promise.set_value( std::move( groups ));
-                } );
-        auto x = future.get();
-        return x;
+        sendActionRequest( client_, "listModelGroups", printer, Json::objectValue, [callback]( auto&& data ) {
+            std::error_code ec; // TODO
+
+            std::vector< std::string > result;
+            if ( data[ Json::StaticString( "ok" ) ].asBool() ) {
+                auto&& modelGroups = data[ Json::StaticString( "groupNames" ) ];
+                std::transform( modelGroups.begin(), modelGroups.end(), std::back_inserter( result ),
+                                []( auto const& modelGroup ) { return modelGroup.asString(); } );
+            }
+            else {
+                ec = std::make_error_code( std::errc::invalid_argument ); // TODO
+            }
+            callback( std::move( result ), ec );
+        } );
     }
 
-    void RepetierClient::listPrinter( repetier::ListPrinterAction::Callback callback )
-    {
-        performAction< repetier::ListPrinterAction >( *client_, callback );
-    }
-
-    std::vector< repetier::Printer > RepetierClient::listPrinter()
-    {
-        return std::vector< repetier::Printer >();
-    }
-
-    void RepetierClient::handleConnect()
-    {
-        if ( connectCallback_ ) {
-            connectCallback_();
-        }
-    }
-
-    void RepetierClient::handleClose( std::string reason )
-    {
-
-    }
-
-    void RepetierClient::handleError( std::error_code ec )
-    {
-
-    }
-*/
 } // namespace gcu
