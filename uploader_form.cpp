@@ -1,6 +1,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstring>
+#include <locale>
 #include <sstream>
 
 #include <iostream>
@@ -13,17 +14,26 @@ namespace gcu {
 
     static std::string const forbiddenPunctuationChars = "\\/:*?\"<>|";
 
+    static std::wstring const forbiddenChars = L"\\/:*?\"<>|";
+
+    static bool isAllowedChar( wchar_t ch )
+    {
+        std::wcout << "check for " << ch << " (" << std::hex << (unsigned) ch << ")\n";
+        return std::isalnum( ch, std::locale::classic() ) ||
+                ( std::ispunct( ch, std::locale::classic() ) && forbiddenChars.find( ch ) == std::string::npos );
+    }
+
     static char const* surrogateChar( int ch )
     {
-        std::cerr << "CHAR: " << (unsigned)(char) ch << ", INT: " << ch << "\n";
+        std::cerr << "CHAR: " << ch << ", INT: " << ch << "\n";
         switch ( ch ) {
-            case (char) 0xe4: return "ae";
-            case (char) 0xc4: return "Ae";
-            case (char) 0xf6: return "oe";
-            case (char) 0xd6: return "Oe";
-            case (char) 0xfc: return "ue";
-            case (char) 0xdc: return "Ue";
-            case (char) 0xdf: return "ss";
+            case 'ä': return "ae";
+            case 'Ä': return "Ae";
+            case 'ö': return "oe";
+            case 'Ö': return "Oe";
+            case 'ü': return "ue";
+            case 'Ü': return "Ue";
+            case 'ß': return "ss";
             default: return "_";
         }
     }
@@ -56,13 +66,17 @@ namespace gcu {
         printerCombox_.enabled( false );
         modelGroupLabel_.text_align( nana::align::left, nana::align_v::center );
         modelGroupCombox_.editable( true );
+        modelGroupCombox_.set_accept( &isAllowedChar );
         modelGroupCombox_.enabled( false );
         modelNameLabel_.text_align( nana::align::left, nana::align_v::center );
-        modelNameTextbox_.enabled( false );
+        modelNameTextbox_.set_accept( &isAllowedChar );
         modelNameTextbox_.reset( generateModelName( gcodePath_.stem().string() ) );
         uploadButton_.enabled( false );
 
         printerCombox_.events().selected.connect( std::bind( &UploaderForm::printerSelected, this ) );
+        modelGroupCombox_.events().selected.connect( std::bind( &UploaderForm::modelGroupSelected, this ) );
+        modelGroupCombox_.events().text_changed.connect( std::bind( &UploaderForm::modelGroupTextChanged, this ) );
+        uploadButton_.events().click.connect( std::bind( &UploaderForm::uploadButtonClicked, this ) );
 
         place_.div( "vertical margin=10"
                             "< weight=23 arrange=[100,variable] fileName >"
@@ -97,6 +111,16 @@ namespace gcu {
     }
 
     void UploaderForm::modelGroupSelected()
+    {
+        uploadButton_.enabled( true );
+    }
+
+    void UploaderForm::modelGroupTextChanged()
+    {
+
+    }
+
+    void UploaderForm::uploadButtonClicked()
     {
 
     }
@@ -158,6 +182,7 @@ namespace gcu {
             modelGroupCombox_.push_back( modelGroup == "#" ? "Default" : modelGroup );
         }
         modelGroupCombox_.enabled( true );
+        modelGroupCombox_.option( 0 );
     }
 
 } // namespace gcu

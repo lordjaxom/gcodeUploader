@@ -24,6 +24,8 @@ namespace gcu {
     private:
         void printerSelected();
         void modelGroupSelected();
+        void modelGroupTextChanged();
+        void uploadButtonClicked();
 
         bool handleError( std::error_code ec );
 
