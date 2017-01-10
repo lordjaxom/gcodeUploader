@@ -20,7 +20,7 @@ namespace gcu {
         {
             using wsclient = websocketpp::client<websocketpp::config::asio_client>;
 
-            using ActionHandler = std::function< void( Json::Value&& data ) >;
+            using ActionHandler = std::function< void( Json::Value&& data, std::error_code ec ) >;
 
             enum Status
             {
