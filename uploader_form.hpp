@@ -24,8 +24,8 @@ namespace gcu {
     private:
         void printerSelected();
         void modelGroupSelected();
-        void modelGroupTextChanged();
-        void uploadButtonClicked();
+        void newModelGroupClicked();
+        void uploadClicked();
 
         bool handleError( std::error_code ec );
 
@@ -46,6 +46,7 @@ namespace gcu {
         nana::combox printerCombox_ { *this };
         nana::label modelGroupLabel_ { *this, "Model group: " };
         nana::combox modelGroupCombox_ { *this };
+        nana::button newModelGroupButton_ { *this, "+" };
         nana::label modelNameLabel_ { *this, "Model name:" };
         nana::textbox modelNameTextbox_ { *this };
         nana::button uploadButton_ { *this, "Upload" };

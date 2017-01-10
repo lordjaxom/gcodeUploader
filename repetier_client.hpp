@@ -31,7 +31,7 @@ namespace gcu {
             };
 
         public:
-            Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, ConnectCallback&& callback );
+            Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback&& callback );
             Client( Client const& ) = delete;
             ~Client();
 
@@ -54,7 +54,7 @@ namespace gcu {
             std::string hostname_;
             std::uint16_t port_;
             std::string apikey_;
-            ConnectCallback callback_;
+            Callback callback_;
             wsclient client_;
             websocketpp::connection_hdl handle_;
             std::thread thread_;

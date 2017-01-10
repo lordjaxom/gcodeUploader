@@ -20,7 +20,7 @@ namespace gcu {
             return os.str();
         }
 
-        Client::Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, ConnectCallback&& callback )
+        Client::Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback&& callback )
                 : hostname_( std::move( hostname ) )
                 , port_( port )
                 , apikey_( std::move( apikey ) )

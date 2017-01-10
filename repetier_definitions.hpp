@@ -24,7 +24,7 @@ namespace gcu {
             std::string slug_;
         };
 
-        using ConnectCallback = std::function< void ( std::error_code ec ) >;
+        using Callback = std::function< void ( std::error_code ec ) >;
         using ListPrinterCallback = std::function< void ( std::vector< Printer >&& printers, std::error_code ec ) >;
         using ListModelGroupsCallback = std::function< void ( std::vector< std::string >&& modelGroups, std::error_code ec ) >;
 

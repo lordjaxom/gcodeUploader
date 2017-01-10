@@ -3,8 +3,6 @@ project(gcodeUploader)
 
 include(CMakeLocal.cmake)
 
-#add_compile_options(-Wall -Wno-unused-variable -Wno-strict-aliasing -std=c++14 -pthread)
-
 set(SOURCE_FILES
         main.cpp
         json.cpp
@@ -23,22 +21,25 @@ set(CMAKE_CXX_STANDARD 14)
 
 find_package(Boost COMPONENTS ""  REQUIRED)
 
-find_path(nana_INCLUDE_DIRS nana/config.hpp HINTS ${nana_ROOT_DIR}/include)
-find_library(nana_LIBRARIES NAMES nana libnana HINTS ${nana_ROOT_DIR})
+find_path(nana_INCLUDE_DIRS nana/config.hpp HINTS ${NANA_ROOT}/include)
+find_library(nana_LIBRARIES NAMES nana libnana HINTS ${NANA_ROOT})
 
-find_path(asio_INCLUDE_DIRS asio.hpp HINTS ${asio_ROOT_DIR}/include)
+find_path(asio_INCLUDE_DIRS asio.hpp HINTS ${ASIO_ROOT}/include)
 set(asio_DEFINITIONS ASIO_STANDALONE)
 
-find_path(websocketpp_INCLUDE_DIRS websocketpp/client.hpp HINTS ${websocketpp_ROOT_DIR})
+find_path(websocketpp_INCLUDE_DIRS websocketpp/client.hpp HINTS ${WEBSOCKETPP_ROOT})
 set(websocketpp_DEFINITIONS _WEBSOCKETPP_CPP11_THREAD_)
 
 find_path(jsoncpp_INCLUDE_DIRS json/json.h HINTS ${JSONCPP_ROOT}/include)
 find_library(jsoncpp_LIBRARIES NAMES jsoncpp libjsoncpp HINTS ${JSONCPP_ROOT}/src/lib_json)
 
+find_path(cpp-netlib_INCLUDE_DIRS boost/network.hpp HINTS ${CPP-NETLIB_ROOT})
+find_library(cpp-netlib_LIBRARIES NAMES cppnetlib-client-connections libcppnetlib-client-connections HINTS ${CPP-NETLIB_ROOT}/libs/network/src)
+
 add_executable(gcodeUploader ${SOURCE_FILES})
 target_compile_definitions(gcodeUploader PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
-target_include_directories(gcodeUploader PRIVATE ${Boost_INCLUDE_DIRS} ${nana_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
-target_link_libraries(gcodeUploader ${Boost_LIBRARIES} ${nana_LIBRARIES} ${jsoncpp_LIBRARIES})
+target_include_directories(gcodeUploader PRIVATE ${Boost_INCLUDE_DIRS} ${nana_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS} ${cpp-netlib_INCLUDE_DIRS})
+target_link_libraries(gcodeUploader ${Boost_LIBRARIES} ${nana_LIBRARIES} ${jsoncpp_LIBRARIES} ${cpp-netlib_LIBRARIES})
 if(WIN32)
     target_link_libraries(gcodeUploader ws2_32 stdc++fs)
 endif()

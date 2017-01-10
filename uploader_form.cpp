@@ -1,12 +1,13 @@
 #include <cctype>
 #include <cstddef>
 #include <cstring>
+#include <algorithm>
 #include <locale>
 #include <sstream>
 
 #include <iostream>
 
-#include <nana/gui/programming_interface.hpp>
+#include <nana/gui/wvl.hpp>
 
 #include "uploader_form.hpp"
 
@@ -16,7 +17,7 @@ namespace gcu {
 
     static std::wstring const forbiddenChars = L"\\/:*?\"<>|";
 
-    static bool isAllowedChar( wchar_t ch )
+    static bool isAllowedChar( char ch )
     {
         std::wcout << "check for " << ch << " (" << std::hex << (unsigned) ch << ")\n";
         return std::isalnum( ch, std::locale::classic() ) ||
@@ -25,7 +26,7 @@ namespace gcu {
 
     static char const* surrogateChar( int ch )
     {
-        std::cerr << "CHAR: " << ch << ", INT: " << ch << "\n";
+        // std::cerr << "CHAR: " << ch << ", INT: " << ch << "\n";
         switch ( ch ) {
             case 'ä': return "ae";
             case 'Ä': return "Ae";
@@ -65,18 +66,16 @@ namespace gcu {
         printerLabel_.text_align( nana::align::left, nana::align_v::center );
         printerCombox_.enabled( false );
         modelGroupLabel_.text_align( nana::align::left, nana::align_v::center );
-        modelGroupCombox_.editable( true );
-        modelGroupCombox_.set_accept( &isAllowedChar );
         modelGroupCombox_.enabled( false );
+        newModelGroupButton_.enabled( false );
         modelNameLabel_.text_align( nana::align::left, nana::align_v::center );
-        modelNameTextbox_.set_accept( &isAllowedChar );
         modelNameTextbox_.reset( generateModelName( gcodePath_.stem().string() ) );
         uploadButton_.enabled( false );
 
         printerCombox_.events().selected.connect( std::bind( &UploaderForm::printerSelected, this ) );
         modelGroupCombox_.events().selected.connect( std::bind( &UploaderForm::modelGroupSelected, this ) );
-        modelGroupCombox_.events().text_changed.connect( std::bind( &UploaderForm::modelGroupTextChanged, this ) );
-        uploadButton_.events().click.connect( std::bind( &UploaderForm::uploadButtonClicked, this ) );
+        newModelGroupButton_.events().click.connect( std::bind( &UploaderForm::newModelGroupClicked, this ) );
+        uploadButton_.events().click.connect( std::bind( &UploaderForm::uploadClicked, this ) );
 
         place_.div( "vertical margin=10"
                             "< weight=23 arrange=[100,variable] fileName >"
@@ -85,7 +84,7 @@ namespace gcu {
                             "< weight=15 >"
                             "< weight=23 arrange=[100,variable] printer >"
                             "< weight=5 >"
-                            "< weight=23 arrange=[100,variable] modelGroup >"
+                            "< weight=23 arrange=[100,variable,23] gap=[0,5] modelGroup >"
                             "< weight=5 >"
                             "< weight=23 arrange=[100,variable] modelName >"
                             "< weight=15 >"
@@ -93,7 +92,7 @@ namespace gcu {
         place_[ "fileName" ] << fileNameLabel_ << fileNameTextbox_;
         place_[ "deleteFile" ] << deleteFileCheckbox_;
         place_[ "printer" ] << printerLabel_ << printerCombox_;
-        place_[ "modelGroup" ] << modelGroupLabel_ << modelGroupCombox_;
+        place_[ "modelGroup" ] << modelGroupLabel_ << modelGroupCombox_ << newModelGroupButton_;
         place_[ "modelName" ] << modelNameLabel_ << modelNameTextbox_;
         place_[ "buttons" ] << uploadButton_;
         place_.collocate();
@@ -115,12 +114,29 @@ namespace gcu {
         uploadButton_.enabled( true );
     }
 
-    void UploaderForm::modelGroupTextChanged()
+    void UploaderForm::newModelGroupClicked()
     {
-
+        nana::inputbox inputbox( *this, "Please enter the name of the new model group", "Input" );
+        nana::inputbox::text text( "Model group:" );
+        inputbox.verify( [&]( nana::window ) {
+            auto value = text.value();
+            return !value.empty() && std::find_if_not( value.begin(), value.end(), &isAllowedChar ) == value.end();
+        } );
+        if ( inputbox.show_modal( text ) ) {
+            std::string value = text.value();
+            client_.addModelGroup( printers_[ printerCombox_.option() ].slug(), value,
+                                   [=]( std::error_code ec ) {
+                                       if ( handleError( ec ) ) {
+                                           return;
+                                       }
+                                       modelGroups_.emplace_back( std::move( value ) );
+                                       modelGroupCombox_.push_back( modelGroups_.back() );
+                                       //modelGroupCombox_.option( modelGroups_.size() - 1 );
+                                   } );
+        }
     }
 
-    void UploaderForm::uploadButtonClicked()
+    void UploaderForm::uploadClicked()
     {
 
     }
@@ -133,6 +149,7 @@ namespace gcu {
 
         printerCombox_.enabled( false );
         modelGroupCombox_.enabled( false );
+        newModelGroupButton_.enabled( false );
         modelNameTextbox_.enabled( false );
         uploadButton_.enabled( false );
         return true;
@@ -183,6 +200,7 @@ namespace gcu {
         }
         modelGroupCombox_.enabled( true );
         modelGroupCombox_.option( 0 );
+        newModelGroupButton_.enabled( true );
     }
 
 } // namespace gcu

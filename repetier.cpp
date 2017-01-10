@@ -23,7 +23,7 @@ namespace gcu {
     RepetierClient::~RepetierClient() = default;
 
     void RepetierClient::connect(
-            std::string hostname, uint16_t port, std::string apikey, repetier::ConnectCallback callback )
+            std::string hostname, uint16_t port, std::string apikey, repetier::Callback callback )
     {
         if ( client_ ) {
             throw std::invalid_argument( "connection already in progress" );
@@ -62,6 +62,20 @@ namespace gcu {
                 ec = std::make_error_code( std::errc::invalid_argument ); // TODO
             }
             callback( std::move( result ), ec );
+        } );
+    }
+
+    void RepetierClient::addModelGroup( std::string const& printer, std::string const& modelGroup,
+                                        repetier::Callback callback )
+    {
+        Json::Value data = Json::objectValue;
+        data[ Json::StaticString( "groupName" ) ] = Json::StaticString( modelGroup.c_str() );
+        sendActionRequest( client_, "addModelGroup", printer, std::move( data ), [callback]( auto&& data ) {
+            std::error_code ec; // TODO
+            if ( !data[ Json::StaticString( "ok" ) ].asBool() ) {
+                ec = std::make_error_code( std::errc::invalid_argument ); // TODO
+            }
+            callback( ec );
         } );
     }
 
