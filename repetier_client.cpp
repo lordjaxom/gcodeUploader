@@ -61,7 +61,7 @@ namespace gcu {
             std::cerr << "INFO: Connection established, logging in\n";
             Json::Value data = Json::objectValue;
             data[ Json::StaticString( "apikey" ) ] = Json::StaticString( apikey_.c_str() );
-            sendActionRequest( "login", "", std::move( data ), [this]( Json::Value&& data ) {
+            sendActionRequest( "login", "", std::move( data ), [this]( Json::Value&& data, std::error_code ec ) {
                 if ( data[ Json::StaticString( "ok" ) ].asBool() ) {
                     std::cerr << "INFO: Login successful, connection completed\n";
                     status_ = CONNECTED;
@@ -154,7 +154,7 @@ namespace gcu {
 
             auto handler = std::move( it->second );
             actionHandlers_.erase( it );
-            handler( std::move( response[ Json::StaticString( "data" ) ] ) );
+            handler( std::move( response[ Json::StaticString( "data" ) ] ), std::error_code() );
         }
 
     } // namespace repetier

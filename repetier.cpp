@@ -6,6 +6,7 @@
 #include <json/value.h>
 
 #include "repetier.hpp"
+#include "repetier_action.hpp"
 #include "repetier_client.hpp"
 
 namespace gcu {
@@ -35,7 +36,7 @@ namespace gcu {
 
     void RepetierClient::listPrinter( repetier::ListPrinterCallback callback )
     {
-        sendActionRequest( client_, "listPrinter", "", Json::objectValue, [callback]( auto&& data ) {
+        sendActionRequest( client_, "listPrinter", "", Json::objectValue, [callback]( auto&& data, std::error_code ec ) {
             std::vector< repetier::Printer > result;
             std::transform( data.begin(), data.end(), std::back_inserter( result ),
                             []( auto const& printer ) {
@@ -49,9 +50,38 @@ namespace gcu {
 
     void RepetierClient::listModelGroups( std::string const& printer, repetier::ListModelGroupsCallback callback )
     {
-        sendActionRequest( client_, "listModelGroups", printer, Json::objectValue, [callback]( auto&& data ) {
-            std::error_code ec; // TODO
+        client_->action( "listModelGroups" )
+                .printer( printer.c_str() )
+                .send( []( std::error_code ec ) {
+                    std::cout << "woot?!\n";
+                } );
 
+        client_->action( "listModelGroups" )
+                .printer( printer.c_str() )
+                .handle( []( auto&& response, std::error_code& ec ) {
+                    if ( !response[ Json::StaticString( "data" ) ][ Json::StaticString( "ok" ) ].asBool() ) {
+                        ec = std::make_error_code( std::errc::invalid_argument );
+                    }
+                    return std::move( response );
+                } )
+                .send( []( Json::Value&& response, std::error_code ec ) {
+                    std::cout << "woot?!\n";
+                } );
+
+
+        /*
+        .handler( []( auto&& response ) {
+            if ( !response[ Json::StaticString( "data" ) ][ Json::StaticString( "ok" ) ].asBool() ) {
+                throw std::system_error( std::make_error_code( std::errc::invalid_argument ) );
+            }
+            return std::move( response );
+        } )
+        .handler( []( auto&& response ) {
+            return std::vector< std::string >();
+        } )
+         */
+
+        sendActionRequest( client_, "listModelGroups", printer, Json::objectValue, [callback]( auto&& data, std::error_code ec ) {
             std::vector< std::string > result;
             if ( data[ Json::StaticString( "ok" ) ].asBool() ) {
                 auto&& modelGroups = data[ Json::StaticString( "groupNames" ) ];
@@ -70,8 +100,7 @@ namespace gcu {
     {
         Json::Value data = Json::objectValue;
         data[ Json::StaticString( "groupName" ) ] = Json::StaticString( modelGroup.c_str() );
-        sendActionRequest( client_, "addModelGroup", printer, std::move( data ), [callback]( auto&& data ) {
-            std::error_code ec; // TODO
+        sendActionRequest( client_, "addModelGroup", printer, std::move( data ), [callback]( auto&& data, std::error_code ec ) {
             if ( !data[ Json::StaticString( "ok" ) ].asBool() ) {
                 ec = std::make_error_code( std::errc::invalid_argument ); // TODO
             }

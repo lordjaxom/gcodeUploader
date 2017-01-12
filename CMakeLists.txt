@@ -15,7 +15,7 @@ set(SOURCE_FILES
         repetier_client.hpp
         repetier_definitions.hpp
         repetier_definitions.cpp
-        resource.rc)
+        resource.rc repetier_action.hpp)
 
 set(CMAKE_CXX_STANDARD 14)
 

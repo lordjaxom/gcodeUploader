@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 
 #include <websocketpp/config/asio_no_tls_client.hpp>
@@ -15,6 +16,8 @@
 
 namespace gcu {
     namespace repetier {
+
+        class Action;
 
         class Client
         {
@@ -39,6 +42,8 @@ namespace gcu {
 
             void sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,
                                     ActionHandler&& handler );
+
+            Action action( char const* action );
 
         private:
             void handleOpen();
