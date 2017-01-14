@@ -4,6 +4,7 @@
 
 #include <json/value.h>
 
+#include "repetier_action.hpp"
 #include "repetier_client.hpp"
 
 namespace gcu {
@@ -123,6 +124,24 @@ namespace gcu {
 
             std::error_code ec;
             client_.close( handle_, websocketpp::close::status::force_tcp_drop, {}, ec );
+        }
+
+        Action Client::action( char const* name )
+        {
+            return Action( this, name );
+        }
+
+        void Client::send( Json::Value& request, Handler&& handler )
+        {
+            auto callbackId = ++nextCallbackId_;
+            request[ Json::StaticString( "callback_id" ) ] = callbackId;
+
+            auto message = jsonContext_.toString( request );
+            std::cerr << ">>> " << message << "\n";
+
+            auto connection = client_.get_con_from_hdl( handle_ );
+            connection->send( message, websocketpp::frame::opcode::text );
+            actionHandlers_.emplace( callbackId, std::move( handler ) );
         }
 
         void Client::sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,

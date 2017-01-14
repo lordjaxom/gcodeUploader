@@ -11,11 +11,12 @@ set(SOURCE_FILES
         uploader_form.hpp
         repetier.cpp
         repetier.hpp
+        repetier_action.hpp
         repetier_client.cpp
         repetier_client.hpp
         repetier_definitions.hpp
         repetier_definitions.cpp
-        resource.rc repetier_action.hpp)
+        resource.rc)
 
 set(CMAKE_CXX_STANDARD 14)
 

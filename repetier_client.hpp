@@ -25,6 +25,8 @@ namespace gcu {
 
             using ActionHandler = std::function< void( Json::Value&& data, std::error_code ec ) >;
 
+            using Handler = std::function< void ( Json::Value&& response, std::error_code ec ) >;
+
             enum Status
             {
                 CONNECTING,
@@ -43,7 +45,9 @@ namespace gcu {
             void sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,
                                     ActionHandler&& handler );
 
-            Action action( char const* action );
+            Action action( char const* name );
+
+            void send( Json::Value& request, Handler&& handler );
 
         private:
             void handleOpen();

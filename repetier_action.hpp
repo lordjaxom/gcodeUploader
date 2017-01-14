@@ -2,122 +2,148 @@
 #define GCODEUPLOADER_REPETIER_ACTION_HPP
 
 #include <cstdint>
+#include <iterator>
 #include <string>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 
 #include <json/value.h>
 
+#include "repetier_client.hpp"
+
 namespace gcu {
     namespace repetier {
 
-        namespace action {
+        namespace detail {
 
-            template< typename ...Handlers >
-            class Handled;
-
-            template< typename Handler0 >
-            class Handled< Handler0 >
+            template< std::size_t I = 0, typename Data, typename Handlers >
+            auto invokeHandlers( Data&& data, std::error_code& ec, Handlers const& handlers,
+                                 std::enable_if_t< I == std::tuple_size< Handlers >::value - 1 >* = nullptr )
             {
-            public:
-                Handled( Handled<>&& previous, Handler0&& handler0 )
-                        : handler0_( std::move( handler0 ) )
-                {
-                }
+                return std::get< I >( handlers )( std::move( data ), ec );
+            }
 
-                template< typename Callback >
-                void send( Callback&& callback )
-                {
-                    auto f = [this, callback]( Json::Value&& response, std::error_code ec ) {
-                        auto handled = ec ? std::result_of_t< Handler0( Json::Value&&, std::error_code& ) >() : handler0_( response, ec );
-                        callback( std::move( handled ), ec );
-                    };
-
-                    Json::Value response;
-                    std::error_code ec;
-                    f( std::move( response ), ec );
-                }
-
-            private:
-                Handler0 handler0_;
-            };
+            template< std::size_t I = 0, typename Data, typename Handlers >
+            auto invokeHandlers( Data&& data, std::error_code& ec, Handlers const& handlers,
+                                 std::enable_if_t< I != std::tuple_size< Handlers >::value - 1 >* = nullptr )
+            {
+                auto handled = std::get< I >( handlers )( std::move( data ), ec );
+                return invokeHandlers< I + 1 >( std::move( handled ), ec, handlers );
+            }
 
             template< typename ...Handlers >
             class Handled
             {
             public:
-                Handled( Json::Value&& request )
-                        : request_( std::move( request ) )
+                Handled( Client* client, Json::Value&& request, std::tuple< Handlers... >&& handlers )
+                        : client_( client )
+                        , request_( std::move( request ) )
+                        , handlers_( std::move( handlers ) )
                 {
                 }
 
                 template< typename Handler >
-                auto handle( Handler&& handler )
+                auto handle( Handler&& handler ) &&
                 {
-                    return Handled< Handler >( std::move( *this ), std::forward< Handler >( handler ) );
+                    auto handlers = std::tuple_cat( std::move( handlers_ ), std::forward_as_tuple( handler ) );
+                    return Handled< Handlers..., Handler >( client_, std::move( request_ ), std::move( handlers ) );
                 }
 
                 template< typename Callback >
-                void send( Callback&& callback )
+                void send( Callback&& callback ) &&
                 {
-                    auto f = [callback]( Json::Value&& response, std::error_code ec ) {
-                        callback( ec );
-                    };
-
-                    Json::Value response;
-                    std::error_code ec;
-                    f( std::move( response ), ec );
+                    auto handlers = std::move( handlers_ );
+                    client_->send( request_, [callback, handlers]( auto&& data, std::error_code ec ) {
+                        auto handled = invokeHandlers( std::move( data ), ec, handlers );
+                        callback( std::move( handled ), ec );
+                    } );
                 }
 
             private:
+                Client* client_;
                 Json::Value request_;
+                std::tuple< Handlers... > handlers_;
             };
 
-        } // namespace action
+        } // namespace detail
 
         class Action
         {
         public:
-            Action( std::intmax_t callbackId, char const* name )
+            Action( Client* client, char const* name )
+                    : client_( client )
             {
-                request_[ Json::StaticString( "callback_id" ) ] = callbackId;
                 request_[ Json::StaticString( "action" ) ] = name;
             }
 
-            Action& printer( char const* value )
+            Action printer( char const* value ) &&
             {
                 request_[ Json::StaticString( "printer" ) ] = value;
-                return *this;
+                return std::move( *this );
             }
 
-            Action& arg( char const* name, char const* value )
+            Action arg( char const* name, char const* value ) &&
             {
                 data_[ Json::StaticString( name ) ] = Json::StaticString( value );
-                return *this;
+                return std::move( *this );
             }
 
             template< typename T >
-            Action& arg( char const* name, T&& value )
+            Action arg( char const* name, T&& value ) &&
             {
                 data_[ Json::StaticString( name ) ] = std::forward< T >( value );
-                return *this;
+                return std::move( *this );
             }
 
             template< typename Handler >
-            auto handle( Handler&& handler )
+            auto handle( Handler&& handler ) &&
             {
-                return action::Handled<>( std::move( request_ ) ).handle( std::forward< Handler >( handler ) );
+                return detail::Handled< Handler >( client_, std::move( request_ ), std::forward_as_tuple( handler ) );
             }
 
             template< typename Callback >
             void send( Callback&& callback )
             {
-                return action::Handled<>( std::move( request_ ) ).send( std::forward< Callback >( callback ) );
+                client_->send( request_, [callback]( auto&& response, std::error_code ec ) { callback( ec ); } );
             }
 
         private:
+            Client* client_;
             Json::Value request_;
             Json::Value& data_ { request_[ Json::StaticString( "data" ) ] = Json::objectValue };
         };
+
+        namespace action {
+
+            inline auto checkOkFlag()
+            {
+                return []( auto&& data, std::error_code& ec ) {
+                    if ( !data[ Json::StaticString( "ok" ) ].asBool() ) {
+                        ec = std::make_error_code( std::errc::invalid_argument ); // TODO
+                    }
+                    return std::move( data );
+                };
+            }
+
+            inline auto resolveKey( char const* key )
+            {
+                return [key]( auto&& data, std::error_code& ec ) {
+                    return Json::Value( std::move( data[ Json::StaticString( key ) ] ) );
+                };
+            }
+
+            template< typename Result, typename Handler >
+            auto transform( Handler&& handler )
+            {
+                return [handler]( auto&& data, std::error_code& ec ) {
+                    std::vector< Result > result;
+                    std::transform( data.begin(), data.end(), std::back_inserter( result ), handler );
+                    return std::move( result );
+                };
+            }
+
+        } // namespace action
 
     } // namespoace repetier
 } // namespace gcu

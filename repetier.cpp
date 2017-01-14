@@ -36,76 +36,36 @@ namespace gcu {
 
     void RepetierClient::listPrinter( repetier::ListPrinterCallback callback )
     {
-        sendActionRequest( client_, "listPrinter", "", Json::objectValue, [callback]( auto&& data, std::error_code ec ) {
-            std::vector< repetier::Printer > result;
-            std::transform( data.begin(), data.end(), std::back_inserter( result ),
-                            []( auto const& printer ) {
-                                return repetier::Printer( printer[ Json::StaticString( "active" ) ].asBool(),
-                                                          printer[ Json::StaticString( "name" ) ].asString(),
-                                                          printer[ Json::StaticString( "slug" ) ].asString() );
-                            } );
-            callback( std::move( result ), {} );
-        } );
+        using namespace repetier::action;
+        client_->action( "listPrinter" )
+                .handle( transform< repetier::Printer >( []( auto&& printer ) {
+                    return repetier::Printer( printer[Json::StaticString( "active" )].asBool(),
+                                              printer[Json::StaticString( "name" )].asString(),
+                                              printer[Json::StaticString( "slug" )].asString());
+                } ) )
+                .send( std::move( callback ) );
     }
 
     void RepetierClient::listModelGroups( std::string const& printer, repetier::ListModelGroupsCallback callback )
     {
+        using namespace repetier::action;
         client_->action( "listModelGroups" )
                 .printer( printer.c_str() )
-                .send( []( std::error_code ec ) {
-                    std::cout << "woot?!\n";
-                } );
-
-        client_->action( "listModelGroups" )
-                .printer( printer.c_str() )
-                .handle( []( auto&& response, std::error_code& ec ) {
-                    if ( !response[ Json::StaticString( "data" ) ][ Json::StaticString( "ok" ) ].asBool() ) {
-                        ec = std::make_error_code( std::errc::invalid_argument );
-                    }
-                    return std::move( response );
-                } )
-                .send( []( Json::Value&& response, std::error_code ec ) {
-                    std::cout << "woot?!\n";
-                } );
-
-
-        /*
-        .handler( []( auto&& response ) {
-            if ( !response[ Json::StaticString( "data" ) ][ Json::StaticString( "ok" ) ].asBool() ) {
-                throw std::system_error( std::make_error_code( std::errc::invalid_argument ) );
-            }
-            return std::move( response );
-        } )
-        .handler( []( auto&& response ) {
-            return std::vector< std::string >();
-        } )
-         */
-
-        sendActionRequest( client_, "listModelGroups", printer, Json::objectValue, [callback]( auto&& data, std::error_code ec ) {
-            std::vector< std::string > result;
-            if ( data[ Json::StaticString( "ok" ) ].asBool() ) {
-                auto&& modelGroups = data[ Json::StaticString( "groupNames" ) ];
-                std::transform( modelGroups.begin(), modelGroups.end(), std::back_inserter( result ),
-                                []( auto const& modelGroup ) { return modelGroup.asString(); } );
-            }
-            else {
-                ec = std::make_error_code( std::errc::invalid_argument ); // TODO
-            }
-            callback( std::move( result ), ec );
-        } );
+                .handle( checkOkFlag() )
+                .handle( resolveKey( "groupNames" ) )
+                .handle( transform< std::string >( []( auto&& groupName ) { return groupName.asString(); } ) )
+                .send( std::move( callback ) );
     }
 
     void RepetierClient::addModelGroup( std::string const& printer, std::string const& modelGroup,
                                         repetier::Callback callback )
     {
-        Json::Value data = Json::objectValue;
-        data[ Json::StaticString( "groupName" ) ] = Json::StaticString( modelGroup.c_str() );
-        sendActionRequest( client_, "addModelGroup", printer, std::move( data ), [callback]( auto&& data, std::error_code ec ) {
-            if ( !data[ Json::StaticString( "ok" ) ].asBool() ) {
-                ec = std::make_error_code( std::errc::invalid_argument ); // TODO
-            }
-            callback( ec );
-        } );
+        using namespace repetier::action;
+        client_->action( "addModelGroup" )
+                .printer( printer.c_str() )
+                .arg( "groupName", modelGroup.c_str() )
+                .handle( checkOkFlag() )
+                .send( [callback]( auto&&, std::error_code ec ) { callback( ec ); } ); // TODO
     }
 
 } // namespace gcu
