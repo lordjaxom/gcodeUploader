@@ -32,6 +32,18 @@ namespace gcu {
                 return invokeHandlers< I + 1 >( std::move( handled ), ec, handlers );
             }
 
+            template< typename Data, typename Callback >
+            void invokeCallback( Data&& data, std::error_code ec, Callback const& callback )
+            {
+                callback( std::forward< Data>( data ), ec );
+            }
+
+            template< typename Callback >
+            void invokeCallback( Json::Value&&, std::error_code ec, Callback const& callback )
+            {
+                callback( ec );
+            }
+
             template< typename ...Handlers >
             class Handled
             {
@@ -56,7 +68,7 @@ namespace gcu {
                     auto handlers = std::move( handlers_ );
                     client_->send( request_, [callback, handlers]( auto&& data, std::error_code ec ) {
                         auto handled = invokeHandlers( std::move( data ), ec, handlers );
-                        callback( std::move( handled ), ec );
+                        invokeCallback( std::move( handled ), ec, callback );
                     } );
                 }
 

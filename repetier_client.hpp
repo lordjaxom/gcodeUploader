@@ -23,8 +23,6 @@ namespace gcu {
         {
             using wsclient = websocketpp::client<websocketpp::config::asio_client>;
 
-            using ActionHandler = std::function< void( Json::Value&& data, std::error_code ec ) >;
-
             using Handler = std::function< void ( Json::Value&& response, std::error_code ec ) >;
 
             enum Status
@@ -36,16 +34,14 @@ namespace gcu {
             };
 
         public:
-            Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback&& callback );
+            Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback< void >&& callback );
             Client( Client const& ) = delete;
             ~Client();
 
             bool connected() const { return status_ == CONNECTED; }
 
-            void sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,
-                                    ActionHandler&& handler );
-
             Action action( char const* name );
+            void upload( std::string const& printer, std::string const& modelGroup, Callback< void >&& callback );
 
             void send( Json::Value& request, Handler&& handler );
 
@@ -63,11 +59,12 @@ namespace gcu {
             std::string hostname_;
             std::uint16_t port_;
             std::string apikey_;
-            Callback callback_;
+            Callback< void > callback_;
             wsclient client_;
             websocketpp::connection_hdl handle_;
             std::thread thread_;
-            std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
+            std::string session_;
+            std::unordered_map< std::intmax_t, Handler > actionHandlers_;
             JsonContext jsonContext_;
 
             Status status_ { CONNECTING };

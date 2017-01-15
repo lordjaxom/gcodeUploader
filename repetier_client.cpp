@@ -2,6 +2,8 @@
 #include <sstream>
 #include <utility>
 
+#include <boost/network/include/http/client.hpp>
+
 #include <json/value.h>
 
 #include "repetier_action.hpp"
@@ -10,7 +12,8 @@
 namespace gcu {
     namespace repetier {
 
-        static std::string buildUrl( std::string const& hostname, std::uint16_t port, std::string const& resource )
+        static std::string buildSocketUrl( std::string const& hostname, std::uint16_t port,
+                                           std::string const& resource )
         {
             std::ostringstream os;
             os << "ws://" << hostname << ':' << port;
@@ -21,7 +24,17 @@ namespace gcu {
             return os.str();
         }
 
-        Client::Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback&& callback )
+        static std::string buildUploadUrl( std::string const& hostname, std::uint16_t port,
+                                           std::string const& printer, std::string const& session,
+                                           std::string const& name )
+        {
+            std::ostringstream os;
+            os << "http://" << hostname << ':' << port << "/printer/model/" << printer << "?a=upload&sess="
+               << session << "&name=" << name;
+            return os.str();
+        }
+
+        Client::Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback< void >&& callback )
                 : hostname_( std::move( hostname ) )
                 , port_( port )
                 , apikey_( std::move( apikey ) )
@@ -33,7 +46,7 @@ namespace gcu {
             client_.init_asio();
 
             std::error_code ec;
-            auto connection = client_.get_connection( buildUrl( hostname_, port_, "/socket" ), ec );
+            auto connection = client_.get_connection( buildSocketUrl( hostname_, port_, "/socket" ), ec );
             if ( ec ) {
                 throw std::system_error( ec );
             }
@@ -60,20 +73,22 @@ namespace gcu {
         void Client::handleOpen()
         {
             std::cerr << "INFO: Connection established, logging in\n";
-            Json::Value data = Json::objectValue;
-            data[ Json::StaticString( "apikey" ) ] = Json::StaticString( apikey_.c_str() );
-            sendActionRequest( "login", "", std::move( data ), [this]( Json::Value&& data, std::error_code ec ) {
-                if ( data[ Json::StaticString( "ok" ) ].asBool() ) {
-                    std::cerr << "INFO: Login successful, connection completed\n";
-                    status_ = CONNECTED;
-                    callback_( {} );
-                }
-                else {
-                    std::cerr << "ERROR: Login failed, closing connection\n";
-                    close( websocketpp::close::status::going_away );
-                    callback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
-                }
-            } );
+
+            action( "login" )
+                    .arg( "apikey", apikey_.c_str() )
+                    .handle( action::checkOkFlag() )
+                    .send( [this]( std::error_code ec ) {
+                        if ( ec ) {
+                            std::cerr << "ERROR: Login failed, closing connection\n";
+                            this->close( websocketpp::close::status::going_away );
+                            callback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
+                        }
+                        else {
+                            std::cerr << "INFO: Login successful, connection completed\n";
+                            status_ = CONNECTED;
+                            callback_( {} );
+                        }
+                    } );
         }
 
         void Client::handleFail()
@@ -104,6 +119,24 @@ namespace gcu {
                 std::cerr << "<<< " << message->get_payload() << "\n";
                 handleActionResponse( callbackId, std::move( response ) );
             }
+        }
+
+        void Client::handleActionResponse( std::intmax_t callbackId, Json::Value&& response )
+        {
+            auto it = actionHandlers_.find( callbackId );
+            if ( it == actionHandlers_.end() ) {
+                std::cerr << "WARN: Received response to unrequested callback " << callbackId << ", ignoring message\n";
+                return;
+            }
+
+            auto& session = response[ Json::StaticString( "session" ) ];
+            if ( !session.isNull() ) {
+                session_ = session.asString();
+            }
+
+            auto handler = std::move( it->second );
+            actionHandlers_.erase( it );
+            handler( std::move( response[ Json::StaticString( "data" ) ] ), std::error_code() );
         }
 
         void Client::close( websocketpp::close::status::value code )
@@ -144,36 +177,16 @@ namespace gcu {
             actionHandlers_.emplace( callbackId, std::move( handler ) );
         }
 
-        void Client::sendActionRequest( std::string const& action, std::string const& printer, Json::Value&& data,
-                                        ActionHandler&& handler )
+        void Client::upload( std::string const& printer, std::string const& modelGroup, Callback< void >&& callback )
         {
-            auto callbackId = ++nextCallbackId_;
+            using namespace boost::network;
+            using client = http::basic_client< http::tags::http_async_8bit_udp_resolve, 1, 1 >;
 
-            Json::Value request = Json::objectValue;
-            request[ Json::StaticString( "action" ) ] = Json::StaticString( action.c_str() );
-            request[ Json::StaticString( "printer" ) ] = Json::StaticString( printer.c_str() );
-            request[ Json::StaticString( "callback_id" ) ] = callbackId;
-            request[ Json::StaticString( "data" ) ] = std::move( data );
+            client cl;
+            client::request request( buildUploadUrl( hostname_, port_, printer, session_, "Test" ) );
+            request << header( "Connection", "close" );
+            auto response = cl.post( request, "M28 S0" );
 
-            auto message = jsonContext_.toString( request );
-            std::cerr << ">>> " << message << "\n";
-
-            auto connection = client_.get_con_from_hdl( handle_ );
-            connection->send( message, websocketpp::frame::opcode::text );
-            actionHandlers_.emplace( callbackId, std::move( handler ) );
-        }
-
-        void Client::handleActionResponse( std::intmax_t callbackId, Json::Value&& response )
-        {
-            auto it = actionHandlers_.find( callbackId );
-            if ( it == actionHandlers_.end() ) {
-                std::cerr << "WARN: Received response to unrequested callback " << callbackId << ", ignoring message\n";
-                return;
-            }
-
-            auto handler = std::move( it->second );
-            actionHandlers_.erase( it );
-            handler( std::move( response[ Json::StaticString( "data" ) ] ), std::error_code() );
         }
 
     } // namespace repetier

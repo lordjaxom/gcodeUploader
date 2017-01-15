@@ -24,9 +24,24 @@ namespace gcu {
             std::string slug_;
         };
 
-        using Callback = std::function< void ( std::error_code ec ) >;
-        using ListPrinterCallback = std::function< void ( std::vector< Printer >&& printers, std::error_code ec ) >;
-        using ListModelGroupsCallback = std::function< void ( std::vector< std::string >&& modelGroups, std::error_code ec ) >;
+        namespace detail {
+
+            template< typename Result >
+            struct Callback
+            {
+                using Type = std::function< void ( Result&&, std::error_code ) >;
+            };
+
+            template<>
+            struct Callback< void >
+            {
+                using Type = std::function< void ( std::error_code ) >;
+            };
+
+        } // namespace detail
+
+        template< typename Result >
+        using Callback = typename detail::Callback< Result >::Type;
 
     } // namespace repetier
 } // namespace gcu

@@ -23,8 +23,8 @@ namespace gcu {
     RepetierClient::RepetierClient() = default;
     RepetierClient::~RepetierClient() = default;
 
-    void RepetierClient::connect(
-            std::string hostname, uint16_t port, std::string apikey, repetier::Callback callback )
+    void RepetierClient::connect( std::string hostname, uint16_t port, std::string apikey,
+                                  repetier::Callback< void > callback )
     {
         if ( client_ ) {
             throw std::invalid_argument( "connection already in progress" );
@@ -34,7 +34,7 @@ namespace gcu {
                 new repetier::Client( std::move( hostname ), port, std::move( apikey ), std::move( callback ) ) );
     }
 
-    void RepetierClient::listPrinter( repetier::ListPrinterCallback callback )
+    void RepetierClient::listPrinter( repetier::Callback< std::vector< repetier::Printer > > callback )
     {
         using namespace repetier::action;
         client_->action( "listPrinter" )
@@ -46,7 +46,8 @@ namespace gcu {
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::listModelGroups( std::string const& printer, repetier::ListModelGroupsCallback callback )
+    void RepetierClient::listModelGroups( std::string const& printer,
+                                          repetier::Callback< std::vector< std::string > > callback )
     {
         using namespace repetier::action;
         client_->action( "listModelGroups" )
@@ -58,14 +59,20 @@ namespace gcu {
     }
 
     void RepetierClient::addModelGroup( std::string const& printer, std::string const& modelGroup,
-                                        repetier::Callback callback )
+                                        repetier::Callback< void > callback )
     {
         using namespace repetier::action;
         client_->action( "addModelGroup" )
                 .printer( printer.c_str() )
                 .arg( "groupName", modelGroup.c_str() )
                 .handle( checkOkFlag() )
-                .send( [callback]( auto&&, std::error_code ec ) { callback( ec ); } ); // TODO
+                .send( callback );
+    }
+
+    void RepetierClient::upload( std::string const& printer, std::string const& modelGroup,
+                                 repetier::Callback< void > callback )
+    {
+        client_->upload( printer, modelGroup, std::move( callback ) );
     }
 
 } // namespace gcu

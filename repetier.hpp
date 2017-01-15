@@ -24,10 +24,11 @@ namespace gcu {
         RepetierClient( RepetierClient const& ) = delete;
         ~RepetierClient();
 
-        void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::Callback callback );
-        void listPrinter( repetier::ListPrinterCallback callback );
-        void listModelGroups( std::string const& printer, repetier::ListModelGroupsCallback callback );
-        void addModelGroup( std::string const& printer, std::string const& modelGroup, repetier::Callback callback );
+        void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::Callback< void > callback );
+        void listPrinter( repetier::Callback< std::vector< repetier::Printer > > callback );
+        void listModelGroups( std::string const& printer, repetier::Callback< std::vector< std::string > > callback );
+        void addModelGroup( std::string const& printer, std::string const& modelGroup, repetier::Callback< void > callback );
+        void upload( std::string const& printer, std::string const& modelGroup, repetier::Callback< void > callback );
 
     private:
         std::unique_ptr< repetier::Client > client_;
