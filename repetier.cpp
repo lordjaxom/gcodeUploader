@@ -69,10 +69,10 @@ namespace gcu {
                 .send( callback );
     }
 
-    void RepetierClient::upload( std::string const& printer, std::string const& modelGroup,
-                                 repetier::Callback< void > callback )
+    void RepetierClient::upload( std::string const& printer, std::string const& modelGroup, std::string const& name,
+                                 std::string gcode, repetier::Callback< void > callback )
     {
-        client_->upload( printer, modelGroup, std::move( callback ) );
+        client_->upload( printer, modelGroup, name, std::move( gcode ), std::move( callback ) );
     }
 
 } // namespace gcu

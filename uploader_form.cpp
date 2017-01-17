@@ -138,7 +138,7 @@ namespace gcu {
 
     void UploaderForm::uploadClicked()
     {
-
+        client_.upload( printers_[ printerCombox_.option() ].slug(), "#", "Testdatei", "M102 X Y Z", []( std::error_code ec ) {} );
     }
 
     bool UploaderForm::handleError( std::error_code ec )

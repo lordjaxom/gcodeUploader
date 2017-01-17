@@ -2,7 +2,7 @@
 #include <sstream>
 #include <utility>
 
-#include <boost/network/include/http/client.hpp>
+#include <asio/io_service.hpp>
 
 #include <json/value.h>
 
@@ -38,19 +38,21 @@ namespace gcu {
                 : hostname_( std::move( hostname ) )
                 , port_( port )
                 , apikey_( std::move( apikey ) )
-                , callback_( std::move( callback ) )
+                , connectCallback_( std::move( callback ) )
+                , httpclient_( boost::network::http::client::options().io_service(
+                        std::shared_ptr< asio::io_service >( &io_service_, []( void const* ) {} ) ) )
         {
-            client_.clear_access_channels( websocketpp::log::alevel::all );
-            client_.clear_error_channels( websocketpp::log::elevel::all );
+            wsclient_.clear_access_channels( websocketpp::log::alevel::all );
+            wsclient_.clear_error_channels( websocketpp::log::elevel::all );
 
-            client_.init_asio();
+            wsclient_.init_asio( &io_service_ );
 
             std::error_code ec;
-            auto connection = client_.get_connection( buildSocketUrl( hostname_, port_, "/socket" ), ec );
+            auto connection = wsclient_.get_connection( buildSocketUrl( hostname_, port_, "/socket" ), ec );
             if ( ec ) {
                 throw std::system_error( ec );
             }
-            handle_ = connection->get_handle();
+            wshandle_ = connection->get_handle();
 
             connection->set_open_handler( std::bind( &Client::handleOpen, this ) );
             connection->set_fail_handler( std::bind( &Client::handleFail, this ) );
@@ -59,15 +61,15 @@ namespace gcu {
 
             std::cerr << "INFO: Connecting to " << connection->get_uri()->str() << "\n";
 
-            client_.connect( connection );
+            wsclient_.connect( connection );
 
-            thread_ = std::thread( [this] { client_.run(); } );
+            io_thread_ = std::thread( [this] { io_service_.run(); } );
         }
 
         Client::~Client()
         {
             close( websocketpp::close::status::normal );
-            thread_.join();
+            io_thread_.join();
         }
 
         void Client::handleOpen()
@@ -81,37 +83,37 @@ namespace gcu {
                         if ( ec ) {
                             std::cerr << "ERROR: Login failed, closing connection\n";
                             this->close( websocketpp::close::status::going_away );
-                            callback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
+                            connectCallback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
                         }
                         else {
                             std::cerr << "INFO: Login successful, connection completed\n";
                             status_ = CONNECTED;
-                            callback_( {} );
+                            connectCallback_( {} );
                         }
                     } );
         }
 
         void Client::handleFail()
         {
-            auto connection = client_.get_con_from_hdl( handle_ );
+            auto connection = wsclient_.get_con_from_hdl( wshandle_ );
             std::cerr << "ERROR: Connection has failed: " << connection->get_ec().message() << "\n";
-            callback_( connection->get_ec() );
+            propagateError( connection->get_ec() );
             forceClose();
         }
 
         void Client::handleClose()
         {
+            auto connection = wsclient_.get_con_from_hdl( wshandle_ );
             if ( status_ != CLOSING ) {
-                auto connection = client_.get_con_from_hdl( handle_ );
                 std::cerr << "ERROR: Connection closed by server: code "
                           << websocketpp::close::status::get_string( connection->get_remote_close_code())
                           << ", reason: " << connection->get_remote_close_reason() << "\n";
-                callback_( std::make_error_code( std::errc::invalid_argument ) ); // TODO
             }
+            propagateError( std::make_error_code( std::errc::invalid_argument ) ); // TODO
             status_ = CLOSED;
         }
 
-        void Client::handleMessage( wsclient::message_ptr message )
+        void Client::handleMessage( websocketclient::message_ptr message )
         {
             auto response = jsonContext_.toJson( message->get_payload() );
             auto callbackId = response[ Json::StaticString( "callback_id" ) ].asLargestInt();
@@ -144,7 +146,7 @@ namespace gcu {
             status_ = CLOSING;
 
             std::error_code ec;
-            client_.close( handle_, code, {}, ec );
+            wsclient_.close( wshandle_, code, {}, ec );
             if ( ec ) {
                 std::cerr << "WARN: Closing connection normally failed, close forced: " << ec.message() << "\n";
                 forceClose();
@@ -156,7 +158,19 @@ namespace gcu {
             status_ = CLOSED;
 
             std::error_code ec;
-            client_.close( handle_, websocketpp::close::status::force_tcp_drop, {}, ec );
+            wsclient_.close( wshandle_, websocketpp::close::status::force_tcp_drop, {}, ec );
+        }
+
+        void Client::propagateError( std::error_code ec )
+        {
+            if ( status_ == CONNECTING ) {
+                connectCallback_( ec );
+            }
+            else if ( status_ == CONNECTED ) {
+                std::for_each( actionHandlers_.begin(), actionHandlers_.end(),
+                               [ec]( auto const& entry ) { entry.second( {}, ec ); } );
+                actionHandlers_.clear();
+            }
         }
 
         Action Client::action( char const* name )
@@ -172,21 +186,26 @@ namespace gcu {
             auto message = jsonContext_.toString( request );
             std::cerr << ">>> " << message << "\n";
 
-            auto connection = client_.get_con_from_hdl( handle_ );
+            auto connection = wsclient_.get_con_from_hdl( wshandle_ );
             connection->send( message, websocketpp::frame::opcode::text );
             actionHandlers_.emplace( callbackId, std::move( handler ) );
         }
 
-        void Client::upload( std::string const& printer, std::string const& modelGroup, Callback< void >&& callback )
+        void Client::upload( std::string const& printer, std::string const& modelGroup, std::string const& name,
+                             std::string&& gcode, Callback< void >&& callback )
         {
             using namespace boost::network;
-            using client = http::basic_client< http::tags::http_async_8bit_udp_resolve, 1, 1 >;
 
-            client cl;
-            client::request request( buildUploadUrl( hostname_, port_, printer, session_, "Test" ) );
+            auto url = buildUploadUrl( hostname_, port_, printer, session_, name );
+
+            std::cerr << "INFO: Uploading G-Code to " << url << "\n";
+
+            http::client::request request( url );
             request << header( "Connection", "close" );
-            auto response = cl.post( request, "M28 S0" );
 
+            http::client::response response = httpclient_.post( request, gcode );
+
+            std::cerr << "DEBUG: Response body " << response.status() << "\n";
         }
 
     } // namespace repetier

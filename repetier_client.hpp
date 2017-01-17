@@ -8,6 +8,8 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include <boost/network/include/http/client.hpp>
+
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 
@@ -21,7 +23,7 @@ namespace gcu {
 
         class Client
         {
-            using wsclient = websocketpp::client<websocketpp::config::asio_client>;
+            using websocketclient = websocketpp::client< websocketpp::config::asio_client >;
 
             using Handler = std::function< void ( Json::Value&& response, std::error_code ec ) >;
 
@@ -41,7 +43,8 @@ namespace gcu {
             bool connected() const { return status_ == CONNECTED; }
 
             Action action( char const* name );
-            void upload( std::string const& printer, std::string const& modelGroup, Callback< void >&& callback );
+            void upload( std::string const& printer, std::string const& modelGroup, std::string const& name,
+                         std::string&& gcode, Callback< void >&& callback );
 
             void send( Json::Value& request, Handler&& handler );
 
@@ -49,26 +52,32 @@ namespace gcu {
             void handleOpen();
             void handleFail();
             void handleClose();
-            void handleMessage( wsclient::message_ptr message );
+            void handleMessage( websocketclient::message_ptr message );
+
+            void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
 
             void close( websocketpp::close::status::value code );
             void forceClose();
 
-            void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
+            void propagateError( std::error_code ec );
 
             std::string hostname_;
             std::uint16_t port_;
             std::string apikey_;
-            Callback< void > callback_;
-            wsclient client_;
-            websocketpp::connection_hdl handle_;
-            std::thread thread_;
-            std::string session_;
-            std::unordered_map< std::intmax_t, Handler > actionHandlers_;
+            Callback< void > connectCallback_;
+
+            websocketclient wsclient_;
+            websocketpp::connection_hdl wshandle_;
+            std::thread wsthread_;
+
+            boost::network::http::client httpclient_;
+
             JsonContext jsonContext_;
 
             Status status_ { CONNECTING };
+            std::string session_;
             std::intmax_t nextCallbackId_ {};
+            std::unordered_map< std::intmax_t, Handler > actionHandlers_;
         };
 
     } // namespace repetier

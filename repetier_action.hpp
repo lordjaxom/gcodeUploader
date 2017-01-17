@@ -17,31 +17,41 @@ namespace gcu {
 
         namespace detail {
 
-            template< std::size_t I = 0, typename Data, typename Handlers >
-            auto invokeHandlers( Data&& data, std::error_code& ec, Handlers const& handlers,
-                                 std::enable_if_t< I == std::tuple_size< Handlers >::value - 1 >* = nullptr )
+            template< std::size_t I, typename Data, typename ...Handlers >
+            auto invokeHandler( Data&& data, std::error_code& ec, std::tuple< Handlers... > const& handlers )
             {
-                return std::get< I >( handlers )( std::move( data ), ec );
+                auto invoker = [&] { return std::get< I >( handlers )( std::forward< Data >( data ), ec ); };
+                return !ec ? invoker() : decltype( invoker() )();
             }
 
-            template< std::size_t I = 0, typename Data, typename Handlers >
-            auto invokeHandlers( Data&& data, std::error_code& ec, Handlers const& handlers,
-                                 std::enable_if_t< I != std::tuple_size< Handlers >::value - 1 >* = nullptr )
+            template< std::size_t I = 0, typename Data, typename ...Handlers >
+            auto invokeHandlers( Data&& data, std::error_code& ec, std::tuple< Handlers... > const& handlers,
+                                 std::enable_if_t< I == sizeof...( Handlers ) - 1 >* = nullptr )
             {
-                auto handled = std::get< I >( handlers )( std::move( data ), ec );
-                return invokeHandlers< I + 1 >( std::move( handled ), ec, handlers );
+                return invokeHandler< I >( std::forward< Data >( data ), ec, handlers );
+            }
+
+            template< std::size_t I = 0, typename Data, typename ...Handlers >
+            auto invokeHandlers( Data&& data, std::error_code& ec, std::tuple< Handlers... > const& handlers,
+                                 std::enable_if_t< I != sizeof...( Handlers ) - 1 >* = nullptr )
+            {
+                auto handled = invokeHandler< I >( std::forward< Data >( data ), ec, handlers );
+                auto subInvoker = [&] { return invokeHandlers< I + 1 >( std::move( handled ), ec, handlers ); };
+                return !ec ? subInvoker() : decltype( subInvoker() )();
             }
 
             template< typename Data, typename Callback >
-            void invokeCallback( Data&& data, std::error_code ec, Callback const& callback )
+            void invokeCallback( Data&& data, std::error_code ec, Callback&& callback,
+                                 std::enable_if_t< !std::is_same< std::remove_reference_t< Data >, Json::Value >::value >* = nullptr )
             {
-                callback( std::forward< Data>( data ), ec );
+                std::forward< Callback >( callback )( std::forward< Data >( data ), ec );
             }
 
-            template< typename Callback >
-            void invokeCallback( Json::Value&&, std::error_code ec, Callback const& callback )
+            template< typename Data, typename Callback >
+            void invokeCallback( Data&& data, std::error_code ec, Callback&& callback,
+                                 std::enable_if_t<  std::is_same< std::remove_reference_t< Data >, Json::Value >::value >* = nullptr )
             {
-                callback( ec );
+                std::forward< Callback >( callback )( ec );
             }
 
             template< typename ...Handlers >
@@ -65,11 +75,12 @@ namespace gcu {
                 template< typename Callback >
                 void send( Callback&& callback ) &&
                 {
-                    auto handlers = std::move( handlers_ );
-                    client_->send( request_, [callback, handlers]( auto&& data, std::error_code ec ) {
-                        auto handled = invokeHandlers( std::move( data ), ec, handlers );
-                        invokeCallback( std::move( handled ), ec, callback );
-                    } );
+                    client_->send( request_,
+                            [callback = std::forward< Callback >( callback ), handlers = std::move( handlers_ )]
+                            ( auto&& data, std::error_code ec ) {
+                                auto handled = invokeHandlers( std::forward< decltype( data ) >( data ), ec, handlers );
+                                invokeCallback( std::move( handled ), ec, callback );
+                            } );
                 }
 
             private:
@@ -117,7 +128,11 @@ namespace gcu {
             template< typename Callback >
             void send( Callback&& callback )
             {
-                client_->send( request_, [callback]( auto&& response, std::error_code ec ) { callback( ec ); } );
+                client_->send( request_,
+                               [callback = std::forward< Callback >( callback )]
+                               ( auto&& data, std::error_code ec ) {
+                                    detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
+                                } );
             }
 
         private:
@@ -130,7 +145,7 @@ namespace gcu {
 
             inline auto checkOkFlag()
             {
-                return []( auto&& data, std::error_code& ec ) {
+                return []( Json::Value&& data, std::error_code& ec ) {
                     if ( !data[ Json::StaticString( "ok" ) ].asBool() ) {
                         ec = std::make_error_code( std::errc::invalid_argument ); // TODO
                     }
@@ -140,19 +155,20 @@ namespace gcu {
 
             inline auto resolveKey( char const* key )
             {
-                return [key]( auto&& data, std::error_code& ec ) {
-                    return Json::Value( std::move( data[ Json::StaticString( key ) ] ) );
+                return [key]( Json::Value&& data, std::error_code& ec ) {
+                    return std::move( data[ Json::StaticString( key ) ] );
                 };
             }
 
             template< typename Result, typename Handler >
             auto transform( Handler&& handler )
             {
-                return [handler]( auto&& data, std::error_code& ec ) {
-                    std::vector< Result > result;
-                    std::transform( data.begin(), data.end(), std::back_inserter( result ), handler );
-                    return std::move( result );
-                };
+                return [handler = std::forward< Handler >( handler )]
+                        ( auto&& data, std::error_code& ec ) {
+                            std::vector< Result > result;
+                            std::transform( data.begin(), data.end(), std::back_inserter( result ), handler );
+                            return std::move( result );
+                        };
             }
 
         } // namespace action
