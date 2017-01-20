@@ -8,8 +8,6 @@
 #include <type_traits>
 #include <unordered_map>
 
-#include <boost/network/include/http/client.hpp>
-
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 
@@ -36,41 +34,31 @@ namespace gcu {
             };
 
         public:
-            Client( std::string&& hostname, std::uint16_t port, std::string&& apikey, Callback< void >&& callback );
+            Client( std::string const& hostname, std::uint16_t port, std::string&& apikey, Callback< void >&& callback );
             Client( Client const& ) = delete;
             ~Client();
 
             bool connected() const { return status_ == CONNECTED; }
 
             Action action( char const* name );
-            void upload( std::string const& printer, std::string const& modelGroup, std::string const& name,
-                         std::string&& gcode, Callback< void >&& callback );
-
             void send( Json::Value& request, Handler&& handler );
 
         private:
-            void handleOpen();
             void handleFail();
             void handleClose();
             void handleMessage( websocketclient::message_ptr message );
 
             void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
 
+            void login( std::string const& apikey, Callback< void > const& callback );
             void close( websocketpp::close::status::value code );
             void forceClose();
 
             void propagateError( std::error_code ec );
 
-            std::string hostname_;
-            std::uint16_t port_;
-            std::string apikey_;
-            Callback< void > connectCallback_;
-
             websocketclient wsclient_;
             websocketpp::connection_hdl wshandle_;
             std::thread wsthread_;
-
-            boost::network::http::client httpclient_;
 
             JsonContext jsonContext_;
 

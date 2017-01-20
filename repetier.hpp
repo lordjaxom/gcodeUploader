@@ -28,6 +28,8 @@ namespace gcu {
                      std::string gcode, repetier::Callback< void > callback );
 
     private:
+        std::string hostname_;
+        std::string port_;
         std::unique_ptr< repetier::Client > client_;
     };
 

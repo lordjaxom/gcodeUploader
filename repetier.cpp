@@ -11,27 +11,20 @@
 
 namespace gcu {
 
-    template< typename Client, typename... Args >
-    static void sendActionRequest( Client& client, Args&&... args )
-    {
-        if ( !client || !client->connected() ) {
-            throw std::invalid_argument( "connection not established" );
-        }
-        client->sendActionRequest( std::forward< Args >( args )... );
-    }
-
     RepetierClient::RepetierClient() = default;
     RepetierClient::~RepetierClient() = default;
 
     void RepetierClient::connect( std::string hostname, uint16_t port, std::string apikey,
                                   repetier::Callback< void > callback )
     {
-        if ( client_ ) {
-            throw std::invalid_argument( "connection already in progress" );
+        if ( client_ && client_->connected() ) {
+            callback( std::make_error_code( std::errc::invalid_argument ) ); // TODO
+            return;
         }
 
-        client_.reset(
-                new repetier::Client( std::move( hostname ), port, std::move( apikey ), std::move( callback ) ) );
+        hostname_ = std::move( hostname );
+        port_ = port;
+        client_.reset( new repetier::Client( hostname_, port_, std::move( apikey ), std::move( callback ) ) );
     }
 
     void RepetierClient::listPrinter( repetier::Callback< std::vector< repetier::Printer > > callback )

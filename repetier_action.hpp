@@ -49,7 +49,7 @@ namespace gcu {
 
             template< typename Data, typename Callback >
             void invokeCallback( Data&& data, std::error_code ec, Callback&& callback,
-                                 std::enable_if_t<  std::is_same< std::remove_reference_t< Data >, Json::Value >::value >* = nullptr )
+                                 std::enable_if_t< std::is_same< std::remove_reference_t< Data >, Json::Value >::value >* = nullptr )
             {
                 std::forward< Callback >( callback )( ec );
             }
@@ -75,12 +75,11 @@ namespace gcu {
                 template< typename Callback >
                 void send( Callback&& callback ) &&
                 {
-                    client_->send( request_,
-                            [callback = std::forward< Callback >( callback ), handlers = std::move( handlers_ )]
-                            ( auto&& data, std::error_code ec ) {
-                                auto handled = invokeHandlers( std::forward< decltype( data ) >( data ), ec, handlers );
-                                invokeCallback( std::move( handled ), ec, callback );
-                            } );
+                    auto handlers = std::move( handlers_ );
+                    client_->send( request_, [callback, handlers] ( auto&& data, std::error_code ec ) {
+                        auto handled = invokeHandlers( std::forward< decltype( data ) >( data ), ec, handlers );
+                        invokeCallback( std::move( handled ), ec, callback );
+                    } );
                 }
 
             private:
@@ -97,12 +96,12 @@ namespace gcu {
             Action( Client* client, char const* name )
                     : client_( client )
             {
-                request_[ Json::StaticString( "action" ) ] = name;
+                request_[ Json::StaticString( "action" ) ] = Json::StaticString( name );
             }
 
             Action printer( char const* value ) &&
             {
-                request_[ Json::StaticString( "printer" ) ] = value;
+                request_[ Json::StaticString( "printer" ) ] = Json::StaticString( value );
                 return std::move( *this );
             }
 
@@ -128,11 +127,9 @@ namespace gcu {
             template< typename Callback >
             void send( Callback&& callback )
             {
-                client_->send( request_,
-                               [callback = std::forward< Callback >( callback )]
-                               ( auto&& data, std::error_code ec ) {
-                                    detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
-                                } );
+                client_->send( request_, [callback] ( auto&& data, std::error_code ec ) {
+                    detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
+                } );
             }
 
         private:
@@ -163,12 +160,11 @@ namespace gcu {
             template< typename Result, typename Handler >
             auto transform( Handler&& handler )
             {
-                return [handler = std::forward< Handler >( handler )]
-                        ( auto&& data, std::error_code& ec ) {
-                            std::vector< Result > result;
-                            std::transform( data.begin(), data.end(), std::back_inserter( result ), handler );
-                            return std::move( result );
-                        };
+                return [handler] ( auto&& data, std::error_code& ec ) {
+                    std::vector< Result > result;
+                    std::transform( data.begin(), data.end(), std::back_inserter( result ), handler );
+                    return std::move( result );
+                };
             }
 
         } // namespace action
