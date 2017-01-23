@@ -29,7 +29,8 @@ namespace gcu {
 
     private:
         std::string hostname_;
-        std::string port_;
+        std::uint16_t port_;
+        std::string apikey_;
         std::unique_ptr< repetier::Client > client_;
     };
 

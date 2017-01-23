@@ -2,7 +2,6 @@
 #define GCODEUPLOADER_REPETIER_CLIENT_HPP
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -17,16 +16,16 @@
 namespace gcu {
     namespace repetier {
 
-        class Action;
-
         class Client
         {
             using websocketclient = websocketpp::client< websocketpp::config::asio_client >;
 
-            using Handler = std::function< void ( Json::Value&& response, std::error_code ec ) >;
+            using ConnectHandler = std::function< void ( std::error_code ec ) >;
+            using ActionHandler = std::function< void ( Json::Value&& response, std::error_code ec ) >;
 
             enum Status
             {
+                NONE,
                 CONNECTING,
                 CONNECTED,
                 CLOSING,
@@ -34,38 +33,39 @@ namespace gcu {
             };
 
         public:
-            Client( std::string const& hostname, std::uint16_t port, std::string&& apikey, Callback< void >&& callback );
+            Client();
             Client( Client const& ) = delete;
             ~Client();
 
             bool connected() const { return status_ == CONNECTED; }
 
-            Action action( char const* name );
-            void send( Json::Value& request, Handler&& handler );
+            void connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
+                          ConnectHandler&& handler );
+            void close();
+
+            void sendActionRequest( Json::Value& request, ActionHandler&& handler );
 
         private:
-            void handleFail();
-            void handleClose();
-            void handleMessage( websocketclient::message_ptr message );
+            void handleOpen( std::string const& apikey, ConnectHandler const& handler );
+            void handleFail( ConnectHandler const& handler );
 
+            void handleClose();
+
+            void handleMessage( websocketclient::message_ptr message );
             void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
 
-            void login( std::string const& apikey, Callback< void > const& callback );
-            void close( websocketpp::close::status::value code );
             void forceClose();
 
             void propagateError( std::error_code ec );
 
             websocketclient wsclient_;
-            websocketpp::connection_hdl wshandle_;
             std::thread wsthread_;
-
-            JsonContext jsonContext_;
-
-            Status status_ { CONNECTING };
-            std::string session_;
+            websocketpp::connection_hdl wshandle_;
+            Status status_ { NONE };
             std::intmax_t nextCallbackId_ {};
-            std::unordered_map< std::intmax_t, Handler > actionHandlers_;
+            std::string session_;
+            std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
+            JsonContext jsonContext_;
         };
 
     } // namespace repetier

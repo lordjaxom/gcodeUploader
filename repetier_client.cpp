@@ -12,8 +12,6 @@
 namespace gcu {
     namespace repetier {
 
-
-
         static std::string buildSocketUrl( std::string const& hostname, std::uint16_t port )
         {
             std::ostringstream os;
@@ -21,67 +19,96 @@ namespace gcu {
             return os.str();
         }
 
-        static std::string buildUploadUrl( std::string const& hostname, std::uint16_t port,
-                                           std::string const& printer, std::string const& session,
-                                           std::string const& name )
-        {
-            std::ostringstream os;
-            os << "http://" << hostname << ':' << port << "/printer/model/" << printer << "?a=upload&sess="
-               << session << "&name=" << name;
-            return os.str();
-        }
-
-        Client::Client( std::string const& hostname, std::uint16_t port, std::string&& apikey,
-                        Callback< void >&& callback )
+        Client::Client()
         {
             wsclient_.clear_access_channels( websocketpp::log::alevel::all );
             wsclient_.clear_error_channels( websocketpp::log::elevel::all );
 
             wsclient_.init_asio();
-
-            std::error_code ec;
-            auto connection = wsclient_.get_connection( buildSocketUrl( hostname, port ), ec );
-            if ( ec ) {
-                throw std::system_error( ec );
-            }
-            wshandle_ = connection->get_handle();
-
-            connection->set_open_handler( [this, apikey, callback]( auto&& ) {
-                this->login( apikey, callback );
-            } );
-            connection->set_fail_handler( [this, callback]( auto&& ) {
-                callback( wsclient_.get_con_from_hdl( wshandle_ )->get_ec() );
-            } );
-            connection->set_close_handler( [this, callback]( auto&& ) {
-                callback( std::make_error_code( std::errc::invalid_argument) ) ; // TODO
-            } );
-            connection->set_message_handler( [this]( auto&&, auto&& message ) {
-                this->handleMessage( std::forward< decltype( message ) >( message ) );
-            } );
-
-            // connection->set_open_handler( std::bind( &Client::handleOpen, this ) );
-            //connection->set_fail_handler( std::bind( &Client::handleFail, this ) );
-            //connection->set_close_handler( std::bind( &Client::handleClose, this ) );
-
-            std::cerr << "INFO: Connecting to " << connection->get_uri()->str() << "\n";
-
-            wsclient_.connect( connection );
+            wsclient_.start_perpetual();
 
             wsthread_ = std::thread( [this] { wsclient_.run(); } );
         }
 
         Client::~Client()
         {
-            close( websocketpp::close::status::normal );
+            close();
+            wsclient_.stop_perpetual();
             wsthread_.join();
         }
-/*
-        void Client::handleFail()
+
+        void Client::connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
+                              ConnectHandler&& handler )
+        {
+            if ( status_ != NONE ) {
+                throw std::invalid_argument( "connect() called on an already connected client" );
+            }
+
+            std::error_code ec;
+            auto connection = wsclient_.get_connection( buildSocketUrl( hostname, port ), ec );
+            if ( ec ) {
+                handler( ec );
+                return;
+            }
+
+            using namespace std::placeholders;
+            connection->set_open_handler( std::bind( &Client::handleOpen, this, std::ref( apikey ), handler ) );
+            connection->set_fail_handler( std::bind( &Client::handleFail, this, std::move( handler ) ) );
+            connection->set_close_handler( std::bind( &Client::handleClose, this ) );
+            connection->set_message_handler( std::bind( &Client::handleMessage, this, _2 ) );
+
+            std::cerr << "INFO: Connecting to " << connection->get_uri()->str() << "\n";
+
+            status_ = CONNECTING;
+            wshandle_ = connection->get_handle();
+            wsclient_.connect( connection );
+        }
+
+        void Client::close()
+        {
+            if ( status_ != CONNECTING && status_ != CONNECTED ) {
+                throw std::invalid_argument( "close() called on already closed (or closing) client" );
+            }
+
+            if ( status_ == CLOSING ) {
+                return forceClose();
+            }
+
+            status_ = CLOSING;
+
+            std::error_code ec;
+            wsclient_.close( wshandle_, websocketpp::close::status::normal, {}, ec );
+            if ( ec ) {
+                std::cerr << "WARN: Closing connection normally failed, close forced: " << ec.message() << "\n";
+                forceClose();
+            }
+        }
+
+        void Client::handleOpen( std::string const& apikey, ConnectHandler const& handler )
+        {
+            std::cerr << "INFO: Connection established, logging in\n";
+
+            makeAction( this, "login" )
+                    .arg( "apikey", apikey.c_str() )
+                    .handle( action::checkOkFlag() )
+                    .send( [this, &handler]( std::error_code ec ) {
+                        if ( ec ) {
+                            std::cerr << "ERROR: Login failed, closing connection\n";
+                            close();
+                        }
+                        else {
+                            std::cerr << "INFO: Login successful, connection ready\n";
+                            status_ = CONNECTED;
+                        }
+                        handler( ec );
+                    } );
+        }
+
+        void Client::handleFail( ConnectHandler const& handler )
         {
             auto connection = wsclient_.get_con_from_hdl( wshandle_ );
-            std::cerr << "ERROR: Connection has failed: " << connection->get_ec().message() << "\n";
-            propagateError( connection->get_ec() );
-            forceClose();
+            std::cerr << "ERROR: Connection failed: " << connection->get_ec() << "\n";
+            handler( connection->get_ec() );
         }
 
         void Client::handleClose()
@@ -92,10 +119,10 @@ namespace gcu {
                           << websocketpp::close::status::get_string( connection->get_remote_close_code())
                           << ", reason: " << connection->get_remote_close_reason() << "\n";
             }
-            propagateError( std::make_error_code( std::errc::invalid_argument ) ); // TODO
             status_ = CLOSED;
+            propagateError( std::make_error_code( std::errc::invalid_argument ) ); // TODO
         }
-*/
+
         void Client::handleMessage( websocketclient::message_ptr message )
         {
             auto response = jsonContext_.toJson( message->get_payload() );
@@ -121,40 +148,20 @@ namespace gcu {
 
             auto handler = std::move( it->second );
             actionHandlers_.erase( it );
-            handler( std::move( response[ Json::StaticString( "data" ) ] ), std::error_code() );
+            handler( std::move( response[ Json::StaticString( "data" ) ] ), {} );
         }
 
-        void Client::login( std::string const& apikey, Callback< void > const& callback )
+        void Client::sendActionRequest( Json::Value& request, ActionHandler&& handler )
         {
-            std::cerr << "INFO: Connection established, logging in\n";
+            auto callbackId = ++nextCallbackId_;
+            request[ Json::StaticString( "callback_id" ) ] = callbackId;
 
-            action( "login" )
-                    .arg( "apikey", apikey.c_str() )
-                    .handle( action::checkOkFlag() )
-                    .send( [this, callback]( std::error_code ec ) {
-                        if ( ec ) {
-                            std::cerr << "ERROR: Login failed, closing connection\n";
-                            this->close( websocketpp::close::status::going_away );
-                            callback( std::make_error_code( std::errc::invalid_argument ) ); // TODO
-                        }
-                        else {
-                            std::cerr << "INFO: Login successful, connection completed\n";
-                            status_ = CONNECTED;
-                            callback( {} );
-                        }
-                    } );
-        }
+            auto message = jsonContext_.toString( request );
+            std::cerr << ">>> " << message << "\n";
 
-        void Client::close( websocketpp::close::status::value code )
-        {
-            status_ = CLOSING;
-
-            std::error_code ec;
-            wsclient_.close( wshandle_, code, {}, ec );
-            if ( ec ) {
-                std::cerr << "WARN: Closing connection normally failed, close forced: " << ec.message() << "\n";
-                forceClose();
-            }
+            auto connection = wsclient_.get_con_from_hdl( wshandle_ );
+            connection->send( message, websocketpp::frame::opcode::text );
+            actionHandlers_.emplace( callbackId, std::move( handler ) );
         }
 
         void Client::forceClose()
@@ -167,32 +174,9 @@ namespace gcu {
 
         void Client::propagateError( std::error_code ec )
         {
-            if ( status_ == CONNECTING ) {
-                connectCallback_( ec );
-            }
-            else if ( status_ == CONNECTED ) {
-                std::for_each( actionHandlers_.begin(), actionHandlers_.end(),
-                               [ec]( auto const& entry ) { entry.second( {}, ec ); } );
-                actionHandlers_.clear();
-            }
-        }
-
-        Action Client::action( char const* name )
-        {
-            return Action( this, name );
-        }
-
-        void Client::send( Json::Value& request, Handler&& handler )
-        {
-            auto callbackId = ++nextCallbackId_;
-            request[ Json::StaticString( "callback_id" ) ] = callbackId;
-
-            auto message = jsonContext_.toString( request );
-            std::cerr << ">>> " << message << "\n";
-
-            auto connection = wsclient_.get_con_from_hdl( wshandle_ );
-            connection->send( message, websocketpp::frame::opcode::text );
-            actionHandlers_.emplace( callbackId, std::move( handler ) );
+            std::for_each( actionHandlers_.begin(), actionHandlers_.end(),
+                           [ec]( auto const& entry ) { entry.second( {}, ec ); } );
+            actionHandlers_.clear();
         }
 
     } // namespace repetier

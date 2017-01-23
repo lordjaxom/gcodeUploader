@@ -2,6 +2,7 @@
 #define GCODEUPLOADER_REPETIER_ACTION_HPP
 
 #include <cstdint>
+#include <algorithm>
 #include <iterator>
 #include <string>
 #include <tuple>
@@ -9,8 +10,6 @@
 #include <utility>
 
 #include <json/value.h>
-
-#include "repetier_client.hpp"
 
 namespace gcu {
     namespace repetier {
@@ -54,7 +53,7 @@ namespace gcu {
                 std::forward< Callback >( callback )( ec );
             }
 
-            template< typename ...Handlers >
+            template< typename Client, typename ...Handlers >
             class Handled
             {
             public:
@@ -69,14 +68,15 @@ namespace gcu {
                 auto handle( Handler&& handler ) &&
                 {
                     auto handlers = std::tuple_cat( std::move( handlers_ ), std::forward_as_tuple( handler ) );
-                    return Handled< Handlers..., Handler >( client_, std::move( request_ ), std::move( handlers ) );
+                    return Handled< Client, Handlers..., Handler >(
+                            client_, std::move( request_ ), std::move( handlers ) );
                 }
 
                 template< typename Callback >
                 void send( Callback&& callback ) &&
                 {
                     auto handlers = std::move( handlers_ );
-                    client_->send( request_, [callback, handlers] ( auto&& data, std::error_code ec ) {
+                    client_->sendActionRequest( request_, [callback, handlers] ( auto&& data, std::error_code ec ) {
                         auto handled = invokeHandlers( std::forward< decltype( data ) >( data ), ec, handlers );
                         invokeCallback( std::move( handled ), ec, callback );
                     } );
@@ -88,55 +88,64 @@ namespace gcu {
                 std::tuple< Handlers... > handlers_;
             };
 
+
+            template< typename Client >
+            class Action
+            {
+            public:
+                Action( Client* client, char const* name )
+                        : client_( client )
+                {
+                    request_[ Json::StaticString( "action" ) ] = Json::StaticString( name );
+                }
+
+                Action printer( char const* value ) &&
+                {
+                    request_[ Json::StaticString( "printer" ) ] = Json::StaticString( value );
+                    return std::move( *this );
+                }
+
+                Action arg( char const* name, char const* value ) &&
+                {
+                    data_[ Json::StaticString( name ) ] = Json::StaticString( value );
+                    return std::move( *this );
+                }
+
+                template< typename T >
+                Action arg( char const* name, T&& value ) &&
+                {
+                    data_[ Json::StaticString( name ) ] = std::forward< T >( value );
+                    return std::move( *this );
+                }
+
+                template< typename Handler >
+                auto handle( Handler&& handler ) &&
+                {
+                    return detail::Handled< Client, Handler >(
+                            client_, std::move( request_ ), std::forward_as_tuple( handler ) );
+                }
+
+                template< typename Callback >
+                void send( Callback&& callback )
+                {
+                    client_->sendActionRequest( request_, [callback] ( auto&& data, std::error_code ec ) {
+                        detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
+                    } );
+                }
+
+            private:
+                Client* client_;
+                Json::Value request_;
+                Json::Value& data_ { request_[ Json::StaticString( "data" ) ] = Json::objectValue };
+            };
+
         } // namespace detail
 
-        class Action
+        template< typename Client >
+        auto makeAction( Client* client, char const* name )
         {
-        public:
-            Action( Client* client, char const* name )
-                    : client_( client )
-            {
-                request_[ Json::StaticString( "action" ) ] = Json::StaticString( name );
-            }
-
-            Action printer( char const* value ) &&
-            {
-                request_[ Json::StaticString( "printer" ) ] = Json::StaticString( value );
-                return std::move( *this );
-            }
-
-            Action arg( char const* name, char const* value ) &&
-            {
-                data_[ Json::StaticString( name ) ] = Json::StaticString( value );
-                return std::move( *this );
-            }
-
-            template< typename T >
-            Action arg( char const* name, T&& value ) &&
-            {
-                data_[ Json::StaticString( name ) ] = std::forward< T >( value );
-                return std::move( *this );
-            }
-
-            template< typename Handler >
-            auto handle( Handler&& handler ) &&
-            {
-                return detail::Handled< Handler >( client_, std::move( request_ ), std::forward_as_tuple( handler ) );
-            }
-
-            template< typename Callback >
-            void send( Callback&& callback )
-            {
-                client_->send( request_, [callback] ( auto&& data, std::error_code ec ) {
-                    detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
-                } );
-            }
-
-        private:
-            Client* client_;
-            Json::Value request_;
-            Json::Value& data_ { request_[ Json::StaticString( "data" ) ] = Json::objectValue };
-        };
+            return detail::Action< Client >( client, name );
+        }
 
         namespace action {
 
