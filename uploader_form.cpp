@@ -9,6 +9,7 @@
 
 #include <nana/gui/wvl.hpp>
 
+#include "repetier_upload.hpp"
 #include "uploader_form.hpp"
 
 namespace gcu {
@@ -138,7 +139,9 @@ namespace gcu {
 
     void UploaderForm::uploadClicked()
     {
-        client_.upload( printers_[ printerCombox_.option() ].slug(), "#", "Testdatei", "M102 X Y Z", []( std::error_code ec ) {} );
+        repetier::upload(
+                "192.168.178.70", 3344, client_.session(), printers_[ printerCombox_.option() ].slug(), "Testdatei",
+                "M102 X Y Z", [this]( std::error_code ec ) { handleError( ec ); } );
     }
 
     bool UploaderForm::handleError( std::error_code ec )
@@ -146,6 +149,10 @@ namespace gcu {
         if ( !ec ) {
             return false;
         }
+
+        nana::msgbox mb( *this, "Error" );
+        mb << ec.message();
+        mb.show();
 
         printerCombox_.enabled( false );
         modelGroupCombox_.enabled( false );

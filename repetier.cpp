@@ -12,12 +12,22 @@
 namespace gcu {
 
     RepetierClient::RepetierClient() = default;
-    RepetierClient::~RepetierClient() = default;
+
+    RepetierClient::~RepetierClient()
+    {
+        client_ = std::experimental::nullopt;
+        thread_.join();
+    }
+
+    std::string RepetierClient::session() const
+    {
+        return client_->session();
+    }
 
     void RepetierClient::connect( std::string hostname, std::uint16_t port, std::string apikey,
-                                  repetier::Callback< void > callback )
+                                  repetier::Callback<> callback )
     {
-        if ( client_ ) {
+        if ( !client_->closed() ) {
             throw std::invalid_argument( "connect() called on an already connected client" );
         }
 
@@ -25,14 +35,13 @@ namespace gcu {
         port_ = port;
         apikey_ = std::move( apikey );
 
-        client_.reset( new repetier::Client );
         client_->connect( hostname_, port_, apikey_, std::move( callback ) );
     }
 
     void RepetierClient::listPrinter( repetier::Callback< std::vector< repetier::Printer > > callback )
     {
         using namespace repetier::action;
-        repetier::makeAction( client_.get(), "listPrinter" )
+        repetier::makeAction( &*client_, "listPrinter" )
                 .handle( transform< repetier::Printer >( []( auto&& printer ) {
                     return repetier::Printer( printer[Json::StaticString( "active" )].asBool(),
                                               printer[Json::StaticString( "name" )].asString(),
@@ -45,7 +54,7 @@ namespace gcu {
                                           repetier::Callback< std::vector< std::string > > callback )
     {
         using namespace repetier::action;
-        repetier::makeAction( client_.get(), "listModelGroups" )
+        repetier::makeAction( &*client_, "listModelGroups" )
                 .printer( printer.c_str() )
                 .handle( checkOkFlag() )
                 .handle( resolveKey( "groupNames" ) )
@@ -54,19 +63,20 @@ namespace gcu {
     }
 
     void RepetierClient::addModelGroup( std::string const& printer, std::string const& modelGroup,
-                                        repetier::Callback< void > callback )
+                                        repetier::Callback<> callback )
     {
         using namespace repetier::action;
-        repetier::makeAction( client_.get(), "addModelGroup" )
+        repetier::makeAction( &*client_, "addModelGroup" )
                 .printer( printer.c_str() )
                 .arg( "groupName", modelGroup.c_str() )
                 .handle( checkOkFlag() )
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::upload( std::string const& printer, std::string const& modelGroup, std::string const& name,
-                                 std::string gcode, repetier::Callback< void > callback )
+    void RepetierClient::upload( std::string const& printer, std::string const& name, std::string const& content,
+                                 repetier::Callback<> callback )
     {
+
     }
 
 } // namespace gcu

@@ -19,28 +19,25 @@ namespace gcu {
             return os.str();
         }
 
-        Client::Client()
+        Client::Client( asio::io_service& service )
         {
             wsclient_.clear_access_channels( websocketpp::log::alevel::all );
             wsclient_.clear_error_channels( websocketpp::log::elevel::all );
 
-            wsclient_.init_asio();
+            wsclient_.init_asio( &service );
             wsclient_.start_perpetual();
-
-            wsthread_ = std::thread( [this] { wsclient_.run(); } );
         }
 
         Client::~Client()
         {
-            close();
             wsclient_.stop_perpetual();
-            wsthread_.join();
+            close();
         }
 
         void Client::connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
                               ConnectHandler&& handler )
         {
-            if ( status_ != NONE ) {
+            if ( status_ != CLOSED ) {
                 throw std::invalid_argument( "connect() called on an already connected client" );
             }
 
@@ -131,6 +128,15 @@ namespace gcu {
                 std::cerr << "<<< " << message->get_payload() << "\n";
                 handleActionResponse( callbackId, std::move( response ) );
             }
+            else if ( response[ Json::StaticString( "eventList" ) ].asBool() ) {
+                auto& eventList = response[ Json::StaticString( "data" ) ];
+                std::for_each( eventList.begin(), eventList.end(), [this]( auto&& event ) {
+                    this->handleEvent( std::move( event ) );
+                } );
+            }
+            else {
+                std::cerr << "WARN: Unknown response (neither callback nor events)\n";
+            }
         }
 
         void Client::handleActionResponse( std::intmax_t callbackId, Json::Value&& response )
@@ -149,6 +155,10 @@ namespace gcu {
             auto handler = std::move( it->second );
             actionHandlers_.erase( it );
             handler( std::move( response[ Json::StaticString( "data" ) ] ), {} );
+        }
+
+        void Client::handleEvent( Json::Value&& event )
+        {
         }
 
         void Client::sendActionRequest( Json::Value& request, ActionHandler&& handler )

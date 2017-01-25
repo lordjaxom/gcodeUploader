@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <unordered_map>
 
+#include <asio/io_service.hpp>
+
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 
@@ -25,24 +27,24 @@ namespace gcu {
 
             enum Status
             {
-                NONE,
+                CLOSED,
                 CONNECTING,
                 CONNECTED,
-                CLOSING,
-                CLOSED
+                CLOSING
             };
 
         public:
-            Client();
+            Client( asio::io_service& service );
             Client( Client const& ) = delete;
             ~Client();
 
+            bool closed() const { return status_ == CLOSED; }
             bool connected() const { return status_ == CONNECTED; }
+            std::string session() const { return session_; }
 
             void connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
                           ConnectHandler&& handler );
             void close();
-
             void sendActionRequest( Json::Value& request, ActionHandler&& handler );
 
         private:
@@ -53,18 +55,20 @@ namespace gcu {
 
             void handleMessage( websocketclient::message_ptr message );
             void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
+            void handleEvent( Json::Value&& event );
 
             void forceClose();
 
             void propagateError( std::error_code ec );
 
             websocketclient wsclient_;
-            std::thread wsthread_;
             websocketpp::connection_hdl wshandle_;
-            Status status_ { NONE };
+
+            Status status_ { CLOSED };
             std::intmax_t nextCallbackId_ {};
             std::string session_;
             std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
+
             JsonContext jsonContext_;
         };
 

@@ -24,24 +24,8 @@ namespace gcu {
             std::string slug_;
         };
 
-        namespace detail {
-
-            template< typename Result >
-            struct Callback
-            {
-                using Type = std::function< void ( Result&&, std::error_code ) >;
-            };
-
-            template<>
-            struct Callback< void >
-            {
-                using Type = std::function< void ( std::error_code ) >;
-            };
-
-        } // namespace detail
-
-        template< typename Result >
-        using Callback = typename detail::Callback< Result >::Type;
+        template< typename ...Args >
+        using Callback = std::function< void ( Args..., std::error_code ) >;
 
     } // namespace repetier
 } // namespace gcu
