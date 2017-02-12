@@ -8,15 +8,18 @@
 int main( int argc, char const* const argv[] )
 {
     try {
-        if ( argc != 2 ) {
+        if ( argc < 2 || argc > 3 ) {
             nana::msgbox msgbox( nullptr, "Error", nana::msgbox::ok );
             msgbox.icon( nana::msgbox::icon_error );
-            msgbox << "Usage: " << argv[ 0 ] << " FILE";
+            msgbox << "Usage: " << argv[ 0 ] << " FILE [PRINTER]";
             msgbox.show();
             return EXIT_FAILURE;
         }
 
-        gcu::UploaderForm form( argv[ 1 ] );
+        std::string gcodePath = argv[ 1 ];
+        std::string printer = argc >= 3 ? argv[ 2 ] : std::string();
+
+        gcu::UploaderForm form( gcodePath, printer );
         form.show();
         nana::exec();
 

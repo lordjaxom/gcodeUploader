@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <algorithm>
 #include <functional>
 #include <iterator>
@@ -10,6 +11,13 @@
 #include "repetier_client.hpp"
 
 namespace gcu {
+
+    static std::string buildUploadUrl( std::string const& hostname, std::uint16_t port, std::string const& printer )
+    {
+        std::ostringstream os;
+        os << "http://" << hostname << ':' << port << "/printer/model/" << printer;
+        return os.str();
+    }
 
     RepetierClient::RepetierClient() = default;
 
@@ -73,10 +81,35 @@ namespace gcu {
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::upload( std::string const& printer, std::string const& name, std::string const& content,
+    void RepetierClient::moveModelFileToGroup( std::string const& printer, std::string const& modelGroup,
+                                               std::string const& file, repetier::Callback<> callback )
+    {
+        using namespace repetier::action;
+        repetier::makeAction( &*client_, "moveModelFileToGroup" )
+                .printer( printer.c_str() )
+                .arg( "groupName", modelGroup.c_str() )
+                .arg( "id", file.c_str() )
+                .handle( checkOkFlag() )
+                .send( std::move( callback ) );
+    }
+
+    void RepetierClient::upload( std::string const& printer, std::string const& name, std::string const& gcodePath,
                                  repetier::Callback<> callback )
     {
+        std::ostringstream os;
+        os << "curl -i -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: " << apikey_ << "\" "
+           << "-F \"a=upload\" -F \"filename=@" << gcodePath << "\" " << buildUploadUrl( hostname_, port_, printer );
+        std::string command = os.str();
 
+        std::cerr << "INFO: Executing " << command << "\n";
+
+        auto status = std::system( command.c_str() );
+
+        std::error_code ec;
+        if ( status != 0 ) {
+            ec = std::make_error_code( std::errc::invalid_argument ); // TODO
+        }
+        callback( ec );
     }
 
 } // namespace gcu

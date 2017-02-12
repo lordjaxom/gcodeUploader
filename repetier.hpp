@@ -28,9 +28,12 @@ namespace gcu {
         void listPrinter( repetier::Callback< std::vector< repetier::Printer > > callback );
         void listModelGroups( std::string const& printer, repetier::Callback< std::vector< std::string > > callback );
         void addModelGroup( std::string const& printer, std::string const& modelGroup, repetier::Callback<> callback );
+        void moveModelFileToGroup(
+                std::string const& printer, std::string const& modelGroup, std::string const& file,
+                repetier::Callback<> callback );
 
         void upload(
-                std::string const& printer, std::string const& name, std::string const& content,
+                std::string const& printer, std::string const& name, std::string const& gcodePath,
                 repetier::Callback<> callback );
 
     private:
@@ -40,7 +43,6 @@ namespace gcu {
 
         asio::io_service service_;
         std::experimental::optional< repetier::Client > client_ { std::experimental::in_place, service_ };
-        std::experimental::optinal< repetier::Upload > upload_;
         std::thread thread_ { [this] { service_.run(); }};
     };
 

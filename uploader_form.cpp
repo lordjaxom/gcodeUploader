@@ -9,7 +9,6 @@
 
 #include <nana/gui/wvl.hpp>
 
-#include "repetier_upload.hpp"
 #include "uploader_form.hpp"
 
 namespace gcu {
@@ -55,9 +54,10 @@ namespace gcu {
         return os.str();
     }
 
-    UploaderForm::UploaderForm( std::string const& gcodePath )
+    UploaderForm::UploaderForm( std::string const& gcodePath, std::string const& printer )
         : form( nana::API::make_center( 400, 250 ), nana::appear::decorate<>() )
         , gcodePath_( gcodePath )
+        , printer_( printer )
     {
         caption( "G-Code Uploader" );
 
@@ -139,9 +139,18 @@ namespace gcu {
 
     void UploaderForm::uploadClicked()
     {
-        repetier::upload(
-                "192.168.178.70", 3344, client_.session(), printers_[ printerCombox_.option() ].slug(), "Testdatei",
-                "M102 X Y Z", [this]( std::error_code ec ) { handleError( ec ); } );
+        printerCombox_.enabled( false );
+        modelGroupCombox_.enabled( false );
+        newModelGroupButton_.enabled( false );
+        modelNameTextbox_.enabled( false );
+        uploadButton_.enabled( false );
+
+        std::string modelName;
+        modelNameTextbox_.getline( 0, modelName );
+        using namespace std::placeholders;
+        client_.upload(
+                printers_[ printerCombox_.option() ].slug(), modelName, gcodePath_.string(),
+                std::bind( &UploaderForm::handleUploaded, this, _1 ) );
     }
 
     bool UploaderForm::handleError( std::error_code ec )
@@ -180,13 +189,17 @@ namespace gcu {
 
         printers_ = std::move( printers );
 
+        std::size_t printerOption = 0;
         printerCombox_.clear();
         for ( auto const& printer : printers_ ) {
+            if ( printer.name() == printer_ ) {
+                printerOption = printerCombox_.the_number_of_options();
+            }
             printerCombox_.push_back( printer.name() );
         }
         if ( !printers_.empty() ) {
             printerCombox_.enabled( true );
-            printerCombox_.option( 0 );
+            printerCombox_.option( printerOption );
         }
         else {
             printerCombox_.enabled( false );
@@ -208,6 +221,33 @@ namespace gcu {
         modelGroupCombox_.enabled( true );
         modelGroupCombox_.option( 0 );
         newModelGroupButton_.enabled( true );
+    }
+
+    void UploaderForm::handleUploaded( std::error_code ec )
+    {
+        if ( handleError( ec ) ) {
+            return;
+        }
+
+        std::string modelGroup = modelGroups_[ modelGroupCombox_.option() ];
+        if ( modelGroup != "#" ) {
+            using namespace std::placeholders;
+            client_.moveModelFileToGroup(
+                    printers_[ printerCombox_.option() ].slug(), modelGroups_[ modelGroupCombox_.option() ],
+                    "whatdoiknow?", std::bind( &UploaderForm::handleUploadFinished, this, _1 ) );
+        }
+        else {
+            handleUploadFinished( {} );
+        }
+    }
+
+    void UploaderForm::handleUploadFinished( std::error_code ec )
+    {
+        if ( handleError( ec ) ) {
+            return;
+        }
+
+        nana::API::exit();
     }
 
 } // namespace gcu

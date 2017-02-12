@@ -19,7 +19,7 @@ namespace gcu {
         : public nana::form
     {
     public:
-        UploaderForm( std::string const& gcodePath );
+        UploaderForm( std::string const& gcodePath, std::string const& printer );
 
     private:
         void printerSelected();
@@ -32,8 +32,11 @@ namespace gcu {
         void handleConnect( std::error_code ec );
         void handleListPrinter( std::vector< repetier::Printer >&& printers, std::error_code ec );
         void handleListModelGroups( std::vector< std::string >&& modelGroups, std::error_code ec );
+        void handleUploaded( std::error_code ec );
+        void handleUploadFinished( std::error_code ec );
 
         std::experimental::filesystem::path gcodePath_;
+        std::string printer_;
         RepetierClient client_;
         std::vector< repetier::Printer > printers_;
         std::vector< std::string > modelGroups_;
