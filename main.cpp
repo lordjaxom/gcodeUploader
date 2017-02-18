@@ -1,34 +1,44 @@
 #include <exception>
 #include <iostream>
 
+#include <getopt.h>
+
 #include <nana/gui/wvl.hpp>
 
+#include "commandline.hpp"
+#include "printer_service.hpp"
 #include "uploader_form.hpp"
+#include "utility.hpp"
 
-int main( int argc, char const* const argv[] )
+namespace gcu {
+
+    template< typename ...Args >
+    auto exitWithError( Args&& ... args )
+    {
+        nana::msgbox msgbox( nullptr, "Error", nana::msgbox::ok );
+        msgbox.icon( nana::msgbox::icon_error );
+        util::stream( msgbox, std::forward< Args >( args )... );
+        msgbox.show();
+        return EXIT_FAILURE;
+    }
+
+} // namespace gcu
+
+int main( int argc, char* const argv[] )
 {
     try {
-        if ( argc < 2 || argc > 3 ) {
-            nana::msgbox msgbox( nullptr, "Error", nana::msgbox::ok );
-            msgbox.icon( nana::msgbox::icon_error );
-            msgbox << "Usage: " << argv[ 0 ] << " FILE [PRINTER]";
-            msgbox.show();
-            return EXIT_FAILURE;
-        }
+        gcu::CommandLine commandLine( argv, argc );
 
-        std::string gcodePath = argv[ 1 ];
-        std::string printer = argc >= 3 ? argv[ 2 ] : std::string();
+        gcu::PrinterService printerService( commandLine.hostname(), commandLine.port(), commandLine.apikey() );
 
-        gcu::UploaderForm form( gcodePath, printer );
+        gcu::UploaderForm form(
+                printerService, commandLine.gcodeFile(), commandLine.printer(), commandLine.deleteFile() );
         form.show();
         nana::exec();
 
         std::cerr << "INFO: Exiting regularly\n";
     }
     catch ( std::exception const& e ) {
-        std::cerr << "ERROR: unexpected exception: " << e.what() << "\n";
-    }
-    catch ( ... ) {
-        std::cerr << "ERROR: what?!\n";
+        return gcu::exitWithError( e.what() );
     }
 }

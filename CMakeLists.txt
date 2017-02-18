@@ -16,7 +16,13 @@ set(SOURCE_FILES
         repetier_client.hpp
         repetier_definitions.cpp
         repetier_definitions.hpp
-        resource.rc)
+        printer_service.cpp
+        printer_service.hpp
+        utility.hpp
+        commandline.cpp
+        commandline.hpp
+        resource.rc
+        std_optional.hpp std_filesystem.hpp)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -34,8 +40,6 @@ set(websocketpp_DEFINITIONS _WEBSOCKETPP_CPP11_THREAD_)
 find_path(jsoncpp_INCLUDE_DIRS json/json.h HINTS ${JSONCPP_ROOT}/include)
 find_library(jsoncpp_LIBRARIES NAMES jsoncpp libjsoncpp HINTS ${JSONCPP_ROOT}/src/lib_json)
 
-find_path(boost-process_INCLUDE_DIRS boost/process.hpp HINTS ${BOOST-PROCESS_ROOT})
-
 if(MINGW)
     add_compile_options(-Wa,-mbig-obj)
 endif()
@@ -43,7 +47,7 @@ endif()
 add_executable(gcodeUploader ${SOURCE_FILES})
 target_compile_definitions(gcodeUploader PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
 target_include_directories(gcodeUploader PRIVATE ${Boost_INCLUDE_DIRS} ${nana_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
-target_link_libraries(gcodeUploader ${Boost_LIBRARIES} ${nana_LIBRARIES} ${jsoncpp_LIBRARIES} ${CPPNETLIB_LIBRARIES})
+target_link_libraries(gcodeUploader ${Boost_LIBRARIES} ${nana_LIBRARIES} ${jsoncpp_LIBRARIES})
 if(WIN32)
     target_link_libraries(gcodeUploader ws2_32 stdc++fs)
 endif()

@@ -1,14 +1,14 @@
 #include <cctype>
 #include <cstddef>
-#include <cstring>
+#include <cstdio>
 #include <algorithm>
 #include <locale>
 #include <sstream>
 
-#include <iostream>
-
+#include <nana/gui/timer.hpp>
 #include <nana/gui/wvl.hpp>
 
+#include "printer_service.hpp"
 #include "uploader_form.hpp"
 
 namespace gcu {
@@ -19,14 +19,12 @@ namespace gcu {
 
     static bool isAllowedChar( char ch )
     {
-        std::wcout << "check for " << ch << " (" << std::hex << (unsigned) ch << ")\n";
-        return std::isalnum( ch, std::locale::classic() ) ||
+        return ch == ' ' || std::isalnum( ch, std::locale::classic() ) ||
                 ( std::ispunct( ch, std::locale::classic() ) && forbiddenChars.find( ch ) == std::string::npos );
     }
 
     static char const* surrogateChar( int ch )
     {
-        // std::cerr << "CHAR: " << ch << ", INT: " << ch << "\n";
         switch ( ch ) {
             case 'ä': return "ae";
             case 'Ä': return "Ae";
@@ -54,16 +52,19 @@ namespace gcu {
         return os.str();
     }
 
-    UploaderForm::UploaderForm( std::string const& gcodePath, std::string const& printer )
-        : form( nana::API::make_center( 400, 250 ), nana::appear::decorate<>() )
-        , gcodePath_( gcodePath )
-        , printer_( printer )
+    UploaderForm::UploaderForm(
+            PrinterService& printerService, std::string const& gcodePath, std::string const& printer, bool deleteFile )
+            : form( nana::API::make_center( 400, 250 ), nana::appear::decorate<>() )
+            , printerService_( printerService )
+            , gcodePath_( gcodePath )
+            , printer_( printer )
     {
         caption( "G-Code Uploader" );
 
         fileNameLabel_.text_align( nana::align::left, nana::align_v::center );
         fileNameTextbox_.enabled( false );
         fileNameTextbox_.reset( gcodePath_.filename().string() );
+        deleteFileCheckbox_.check( deleteFile );
         printerLabel_.text_align( nana::align::left, nana::align_v::center );
         printerCombox_.enabled( false );
         modelGroupLabel_.text_align( nana::align::left, nana::align_v::center );
@@ -73,10 +74,11 @@ namespace gcu {
         modelNameTextbox_.reset( generateModelName( gcodePath_.stem().string() ) );
         uploadButton_.enabled( false );
 
-        printerCombox_.events().selected.connect( std::bind( &UploaderForm::printerSelected, this ) );
-        modelGroupCombox_.events().selected.connect( std::bind( &UploaderForm::modelGroupSelected, this ) );
-        newModelGroupButton_.events().click.connect( std::bind( &UploaderForm::newModelGroupClicked, this ) );
-        uploadButton_.events().click.connect( std::bind( &UploaderForm::uploadClicked, this ) );
+        printerCombox_.events().selected.connect( [this] { printerSelected(); } );
+        modelGroupCombox_.events().selected.connect( [this] { modelGroupSelected(); } );
+        newModelGroupButton_.events().click.connect( [this] { newModelGroupClicked(); } );
+        modelNameTextbox_.events().text_changed.connect( [this] { checkModelName(); } );
+        uploadButton_.events().click.connect( [this] { uploadClicked(); } );
 
         place_.div( "vertical margin=10"
                             "< weight=23 arrange=[100,variable] fileName >"
@@ -89,30 +91,44 @@ namespace gcu {
                             "< weight=5 >"
                             "< weight=23 arrange=[100,variable] modelName >"
                             "< weight=15 >"
-                            "< weight=25 <> < buttons weight=100 > >" );
+                            "< weight=25 <> < buttons weight=100 > >"
+                            "< weight=5 >"
+                            "< weight=23 info >");
         place_[ "fileName" ] << fileNameLabel_ << fileNameTextbox_;
         place_[ "deleteFile" ] << deleteFileCheckbox_;
         place_[ "printer" ] << printerLabel_ << printerCombox_;
         place_[ "modelGroup" ] << modelGroupLabel_ << modelGroupCombox_ << newModelGroupButton_;
         place_[ "modelName" ] << modelNameLabel_ << modelNameTextbox_;
         place_[ "buttons" ] << uploadButton_;
+        place_[ "info" ] << infoLabel_;
         place_.collocate();
 
-        using namespace std::placeholders;
-        client_.connect( "192.168.178.70", 3344, "7f77558d-75e1-45e1-b424-74c5c81b6b47",
-                         std::bind( &UploaderForm::handleConnect, this, _1 ) );
+        printerService_.connectionLost.connect( [this]( auto ec ) {
+            this->handleConnectionLost( ec );
+        } );
+        printerService_.printersChanged.connect( [this]( auto&& printers ) {
+            this->handlePrintersChanged( std::move( printers ) );
+        } );
+        printerService_.modelGroupsChanged.connect( [this]( auto const& printer, auto&& modelGroups ) {
+            this->handleModelGroupsChanged( printer, std::move( modelGroups ) );
+        } );
+        printerService_.modelsChanged.connect( [this]( auto const& printer, auto&& models ) {
+            this->handleModelsChanged( printer, std::move( models ) );
+        } );
+        printerService_.requestPrinters();
     }
 
     void UploaderForm::printerSelected()
     {
-        using namespace std::placeholders;
-        client_.listModelGroups( printers_[ printerCombox_.option() ].slug(),
-                                 std::bind( &UploaderForm::handleListModelGroups, this, _1, _2 ) );
+        auto const& printer = selectedPrinterSlug();
+        printerService_.requestModelGroups( printer );
+        printerService_.requestModels( printer );
     }
 
     void UploaderForm::modelGroupSelected()
     {
         uploadButton_.enabled( true );
+        checkModelName();
     }
 
     void UploaderForm::newModelGroupClicked()
@@ -124,130 +140,138 @@ namespace gcu {
             return !value.empty() && std::find_if_not( value.begin(), value.end(), &isAllowedChar ) == value.end();
         } );
         if ( inputbox.show_modal( text ) ) {
-            std::string value = text.value();
-            client_.addModelGroup( printers_[ printerCombox_.option() ].slug(), value,
-                                   [=]( std::error_code ec ) {
-                                       if ( handleError( ec ) ) {
-                                           return;
-                                       }
-                                       modelGroups_.emplace_back( std::move( value ) );
-                                       modelGroupCombox_.push_back( modelGroups_.back() );
-                                       //modelGroupCombox_.option( modelGroups_.size() - 1 );
-                                   } );
+            modelGroup_ = text.value();
+            printerService_.addModelGroup( selectedPrinterSlug(), modelGroup_ );
         }
+    }
+
+    void UploaderForm::checkModelName()
+    {
+        auto modelId = existingModelId( enteredModelName(), selectedModelGroup() );
+        infoLabel_.caption( modelId != invalidId ? "Existing G-Code file will be overwritten!" : "" );
     }
 
     void UploaderForm::uploadClicked()
     {
+        deleteFileCheckbox_.enabled( false );
         printerCombox_.enabled( false );
         modelGroupCombox_.enabled( false );
         newModelGroupButton_.enabled( false );
         modelNameTextbox_.enabled( false );
         uploadButton_.enabled( false );
 
-        std::string modelName;
-        modelNameTextbox_.getline( 0, modelName );
-        using namespace std::placeholders;
-        client_.upload(
-                printers_[ printerCombox_.option() ].slug(), modelName, gcodePath_.string(),
-                std::bind( &UploaderForm::handleUploaded, this, _1 ) );
+        auto printer = selectedPrinterSlug();
+        auto modelName = enteredModelName();
+        auto modelGroup = selectedModelGroup();
+        auto deleteFile = deleteFileCheckbox_.checked();
+
+        auto modelId = existingModelId( modelName, modelGroup );
+        if ( modelId != invalidId ) {
+            printerService_.removeModel(
+                    printer, modelId,
+                    [this, printer = std::move( printer ), modelName = std::move( modelName ),
+                            modelGroup = std::move( modelGroup ), deleteFile] {
+                performUpload( printer, modelName, modelGroup, deleteFile );
+            } );
+        }
+        else {
+            performUpload( printer, modelName, modelGroup, deleteFile );
+        }
     }
 
-    bool UploaderForm::handleError( std::error_code ec )
+    void UploaderForm::performUpload(
+            std::string const& printer, std::string const& modelName, std::string const& modelGroup, bool deleteFile )
     {
-        if ( !ec ) {
-            return false;
-        }
+        printerService_.upload( printer, modelName, modelGroup, gcodePath_, [this, deleteFile] {
+            if ( deleteFile ) {
+                std::remove( gcodePath_.string().c_str() );
+            }
+            close();
+        } );
+    }
 
+    void UploaderForm::handleConnectionLost( std::error_code ec )
+    {
         nana::msgbox mb( *this, "Error" );
-        mb << ec.message();
+        mb << "Connection lost: " << ec.message();
         mb.show();
 
-        printerCombox_.enabled( false );
-        modelGroupCombox_.enabled( false );
-        newModelGroupButton_.enabled( false );
-        modelNameTextbox_.enabled( false );
-        uploadButton_.enabled( false );
-        return true;
+        close();
     }
 
-    void UploaderForm::handleConnect( std::error_code ec )
+    void UploaderForm::handlePrintersChanged( std::vector< repetier::Printer >&& printers )
     {
-        if ( handleError( ec ) ) {
-            return;
-        }
-
-        using namespace std::placeholders;
-        client_.listPrinter( std::bind( &UploaderForm::handleListPrinter, this, _1, _2 ) );
-    }
-
-    void UploaderForm::handleListPrinter( std::vector< repetier::Printer >&& printers, std::error_code ec )
-    {
-        if ( handleError( ec ) ) {
-            return;
-        }
-
         printers_ = std::move( printers );
 
-        std::size_t printerOption = 0;
+        std::size_t option = 0;
         printerCombox_.clear();
         for ( auto const& printer : printers_ ) {
             if ( printer.name() == printer_ ) {
-                printerOption = printerCombox_.the_number_of_options();
+                option = printerCombox_.the_number_of_options();
             }
             printerCombox_.push_back( printer.name() );
         }
         if ( !printers_.empty() ) {
             printerCombox_.enabled( true );
-            printerCombox_.option( printerOption );
+            printerCombox_.option( option );
         }
         else {
             printerCombox_.enabled( false );
         }
     }
 
-    void UploaderForm::handleListModelGroups( std::vector< std::string >&& modelGroups, std::error_code ec )
+    void UploaderForm::handleModelGroupsChanged(
+            std::string const& printer, std::vector< repetier::ModelGroup >&& modelGroups )
     {
-        if ( handleError( ec ) ) {
-            return;
-        }
+        if ( selectedPrinterSlug() == printer ) {
+            modelGroups_ = std::move( modelGroups );
 
-        modelGroups_ = std::move( modelGroups );
-
-        modelGroupCombox_.clear();
-        for ( auto const& modelGroup : modelGroups_ ) {
-            modelGroupCombox_.push_back( modelGroup == "#" ? "Default" : modelGroup );
-        }
-        modelGroupCombox_.enabled( true );
-        modelGroupCombox_.option( 0 );
-        newModelGroupButton_.enabled( true );
-    }
-
-    void UploaderForm::handleUploaded( std::error_code ec )
-    {
-        if ( handleError( ec ) ) {
-            return;
-        }
-
-        std::string modelGroup = modelGroups_[ modelGroupCombox_.option() ];
-        if ( modelGroup != "#" ) {
-            using namespace std::placeholders;
-            client_.moveModelFileToGroup(
-                    printers_[ printerCombox_.option() ].slug(), modelGroups_[ modelGroupCombox_.option() ],
-                    "whatdoiknow?", std::bind( &UploaderForm::handleUploadFinished, this, _1 ) );
-        }
-        else {
-            handleUploadFinished( {} );
+            std::size_t option = 0;
+            modelGroupCombox_.clear();
+            for ( auto const& modelGroup : modelGroups_ ) {
+                if ( modelGroup.name() == modelGroup_ ) {
+                    option = modelGroupCombox_.the_number_of_options();
+                }
+                modelGroupCombox_.push_back( modelGroup.defaultGroup() ? "Default" : modelGroup.name() );
+            }
+            modelGroupCombox_.enabled( true );
+            modelGroupCombox_.option( option );
+            newModelGroupButton_.enabled( true );
         }
     }
 
-    void UploaderForm::handleUploadFinished( std::error_code ec )
+    void UploaderForm::handleModelsChanged( std::string const& printer, std::vector< repetier::Model >&& models )
     {
-        if ( handleError( ec ) ) {
-            return;
-        }
+        if ( selectedPrinterSlug() == printer ) {
+            models_ = std::move( models );
 
-        nana::API::exit();
+            checkModelName();
+        }
+    }
+
+    std::string UploaderForm::selectedPrinterSlug() const
+    {
+        return printers_[ printerCombox_.option() ].slug();
+    }
+
+    std::string UploaderForm::selectedModelGroup() const
+    {
+        return modelGroups_[ modelGroupCombox_.option() ].name();
+    }
+
+    std::string UploaderForm::enteredModelName() const
+    {
+        std::string modelName;
+        modelNameTextbox_.getline( 0, modelName );
+        return modelName;
+    }
+
+    unsigned UploaderForm::existingModelId( std::string const& modelName, std::string const& modelGroup ) const
+    {
+        auto it = std::find_if( models_.begin(), models_.end(), [&]( auto const& item ) {
+            return item.name() == modelName && item.modelGroup() == modelGroup;
+        } );
+        return it != models_.end() ? it->id() : invalidId;
     }
 
 } // namespace gcu

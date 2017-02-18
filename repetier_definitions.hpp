@@ -24,6 +24,34 @@ namespace gcu {
             std::string slug_;
         };
 
+        class Model
+        {
+        public:
+            Model( unsigned id, std::string name, std::string modelGroup );
+
+            unsigned id() const { return id_; }
+            std::string const& name() const { return name_; }
+            std::string const& modelGroup() const { return modelGroup_; }
+
+        private:
+            unsigned id_;
+            std::string name_;
+            std::string modelGroup_;
+        };
+
+        class ModelGroup
+        {
+        public:
+            ModelGroup( std::string name );
+
+            std::string const& name() const { return name_; }
+            bool defaultGroup() const { return defaultGroup_; }
+
+        private:
+            std::string name_;
+            bool defaultGroup_;
+        };
+
         template< typename ...Args >
         using Callback = std::function< void ( Args..., std::error_code ) >;
 

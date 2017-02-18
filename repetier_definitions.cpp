@@ -11,6 +11,19 @@ namespace gcu {
         {
         }
 
+        Model::Model( unsigned id, std::string name, std::string modelGroup )
+                : id_( id )
+                , name_( std::move( name ) )
+                , modelGroup_( std::move( modelGroup ) )
+        {
+        }
+
+        ModelGroup::ModelGroup( std::string name )
+                : name_( std::move( name ) )
+                , defaultGroup_( name_ == "#" )
+        {
+        }
+
     } // namespace repetier
 
 } // namespace gcu

@@ -6,7 +6,8 @@
 #include <string>
 #include <thread>
 
-#include <experimental/optional>
+#include "std_filesystem.hpp"
+#include "std_optional.hpp"
 
 #include <asio/io_service.hpp>
 
@@ -22,19 +23,23 @@ namespace gcu {
         RepetierClient( RepetierClient const& ) = delete;
         ~RepetierClient();
 
-        std::string session() const;
+        bool connected() const;
+
+        repetier::ClientEvents& events();
 
         void connect( std::string hostname, std::uint16_t port, std::string apikey, repetier::Callback<> callback );
         void listPrinter( repetier::Callback< std::vector< repetier::Printer > > callback );
-        void listModelGroups( std::string const& printer, repetier::Callback< std::vector< std::string > > callback );
+        void listModels( std::string const& printer, repetier::Callback< std::vector< repetier::Model > > callback );
+        void listModelGroups( std::string const& printer, repetier::Callback< std::vector< repetier::ModelGroup > > callback );
         void addModelGroup( std::string const& printer, std::string const& modelGroup, repetier::Callback<> callback );
+        void removeModel( std::string const& printer, unsigned id, repetier::Callback<> callback );
         void moveModelFileToGroup(
-                std::string const& printer, std::string const& modelGroup, std::string const& file,
+                std::string const& printer, unsigned id, std::string const& modelGroup,
                 repetier::Callback<> callback );
 
         void upload(
-                std::string const& printer, std::string const& name, std::string const& gcodePath,
-                repetier::Callback<> callback );
+                std::string const& printer, std::string const& modelName, std::string const& modelGroup,
+                std::filesystem::path const& gcodePath, repetier::Callback<> callback );
 
     private:
         std::string hostname_;
@@ -42,7 +47,7 @@ namespace gcu {
         std::string apikey_;
 
         asio::io_service service_;
-        std::experimental::optional< repetier::Client > client_ { std::experimental::in_place, service_ };
+        std::optional< repetier::Client > client_ { std::in_place, service_ };
         std::thread thread_ { [this] { service_.run(); }};
     };
 

@@ -1,7 +1,9 @@
 #ifndef GCODEUPLOADER_UPLOADER_FORM_HPP
 #define GCODEUPLOADER_UPLOADER_FORM_HPP
 
-#include <experimental/filesystem>
+#include <limits>
+
+#include "std_filesystem.hpp"
 
 #include <nana/gui/place.hpp>
 #include <nana/gui/widgets/button.hpp>
@@ -15,31 +17,45 @@
 
 namespace gcu {
 
+    class PrinterService;
+
     class UploaderForm
         : public nana::form
     {
+        static constexpr unsigned invalidId = std::numeric_limits< unsigned >::max();
+
     public:
-        UploaderForm( std::string const& gcodePath, std::string const& printer );
+        UploaderForm(
+                PrinterService& printerService, std::string const& gcodePath, std::string const& printer,
+                bool deleteFile );
 
     private:
         void printerSelected();
         void modelGroupSelected();
         void newModelGroupClicked();
+        void checkModelName();
         void uploadClicked();
+        void performUpload(
+                std::string const& printer, std::string const& modelName, std::string const& modelGroup,
+                bool deleteFile );
 
-        bool handleError( std::error_code ec );
+        void handleConnectionLost( std::error_code ec );
+        void handlePrintersChanged( std::vector< repetier::Printer >&& printers );
+        void handleModelGroupsChanged( std::string const& printer, std::vector< repetier::ModelGroup >&& modelGroups );
+        void handleModelsChanged( std::string const& printer, std::vector< repetier::Model >&& models );
 
-        void handleConnect( std::error_code ec );
-        void handleListPrinter( std::vector< repetier::Printer >&& printers, std::error_code ec );
-        void handleListModelGroups( std::vector< std::string >&& modelGroups, std::error_code ec );
-        void handleUploaded( std::error_code ec );
-        void handleUploadFinished( std::error_code ec );
+        std::string selectedPrinterSlug() const;
+        std::string selectedModelGroup() const;
+        std::string enteredModelName() const;
+        unsigned existingModelId( std::string const& modelName, std::string const& modelGroup ) const;
 
-        std::experimental::filesystem::path gcodePath_;
+        PrinterService& printerService_;
+        std::filesystem::path gcodePath_;
         std::string printer_;
-        RepetierClient client_;
+        std::string modelGroup_;
         std::vector< repetier::Printer > printers_;
-        std::vector< std::string > modelGroups_;
+        std::vector< repetier::ModelGroup > modelGroups_;
+        std::vector< repetier::Model > models_;
 
         nana::place place_ { *this };
         nana::label fileNameLabel_ { *this, "G-Code file:" };
@@ -53,6 +69,7 @@ namespace gcu {
         nana::label modelNameLabel_ { *this, "Model name:" };
         nana::textbox modelNameTextbox_ { *this };
         nana::button uploadButton_ { *this, "Upload" };
+        nana::label infoLabel_ { *this };
     };
 
 } // namespace gcu

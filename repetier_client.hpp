@@ -9,6 +9,8 @@
 
 #include <asio/io_service.hpp>
 
+#include <boost/signals2/signal.hpp>
+
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 
@@ -17,6 +19,13 @@
 
 namespace gcu {
     namespace repetier {
+
+        struct ClientEvents
+        {
+            boost::signals2::signal< void () > printersChanged;
+            boost::signals2::signal< void ( std::string const& printer ) > modelGroupsChanged;
+            boost::signals2::signal< void ( std::string const& printer ) > modelsChanged;
+        };
 
         class Client
         {
@@ -40,35 +49,36 @@ namespace gcu {
 
             bool closed() const { return status_ == CLOSED; }
             bool connected() const { return status_ == CONNECTED; }
-            std::string session() const { return session_; }
 
             void connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
                           ConnectHandler&& handler );
             void close();
             void sendActionRequest( Json::Value& request, ActionHandler&& handler );
 
+            ClientEvents& events() { return events_; }
+
         private:
-            void handleOpen( std::string const& apikey, ConnectHandler const& handler );
-            void handleFail( ConnectHandler const& handler );
-
+            void handleOpen();
+            void handleFail();
             void handleClose();
-
             void handleMessage( websocketclient::message_ptr message );
             void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
             void handleEvent( Json::Value&& event );
 
+            void close( bool checked );
             void forceClose();
 
             void propagateError( std::error_code ec );
 
             websocketclient wsclient_;
             websocketpp::connection_hdl wshandle_;
-
             Status status_ { CLOSED };
             std::intmax_t nextCallbackId_ {};
+            std::string const* apikey_;
+            ConnectHandler connectHandler_;
             std::string session_;
             std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
-
+            ClientEvents events_;
             JsonContext jsonContext_;
         };
 

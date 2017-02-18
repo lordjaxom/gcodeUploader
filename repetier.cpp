@@ -1,39 +1,60 @@
+#include <cstdio>
 #include <cstdlib>
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <thread>
 #include <utility>
 
 #include <json/value.h>
 
 #include "repetier.hpp"
 #include "repetier_action.hpp"
-#include "repetier_client.hpp"
+#include "utility.hpp"
 
 namespace gcu {
 
-    static std::string buildUploadUrl( std::string const& hostname, std::uint16_t port, std::string const& printer )
+    struct UploadUrl
     {
-        std::ostringstream os;
-        os << "http://" << hostname << ':' << port << "/printer/model/" << printer;
-        return os.str();
-    }
+        UploadUrl( std::string const& hostname, std::uint16_t port, std::string const& printer )
+                : hostname_( hostname )
+                , port_( port )
+                , printer_( printer )
+        {
+        }
+
+        template< typename Stream >
+        decltype( auto ) friend operator<<( Stream&& stream, UploadUrl const& value )
+        {
+            return stream << "http://" << value.hostname_ << ':' << value.port_ << "/printer/model/" << value.printer_;
+        }
+
+    private:
+        std::string const& hostname_;
+        std::uint16_t port_;
+        std::string const& printer_;
+    };
 
     RepetierClient::RepetierClient() = default;
 
     RepetierClient::~RepetierClient()
     {
-        client_ = std::experimental::nullopt;
+        client_ = std::nullopt;
         thread_.join();
     }
 
-    std::string RepetierClient::session() const
+    bool RepetierClient::connected() const
     {
-        return client_->session();
+        return client_ && client_->connected();
     }
 
-    void RepetierClient::connect( std::string hostname, std::uint16_t port, std::string apikey,
-                                  repetier::Callback<> callback )
+    repetier::ClientEvents& RepetierClient::events()
+    {
+        return client_->events();
+    }
+
+    void RepetierClient::connect(
+            std::string hostname, std::uint16_t port, std::string apikey, repetier::Callback<> callback )
     {
         if ( !client_->closed() ) {
             throw std::invalid_argument( "connect() called on an already connected client" );
@@ -58,20 +79,38 @@ namespace gcu {
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::listModelGroups( std::string const& printer,
-                                          repetier::Callback< std::vector< std::string > > callback )
+    void RepetierClient::listModels( std::string const& printer,
+                                     repetier::Callback< std::vector< gcu::repetier::Model > > callback )
+    {
+        using namespace repetier::action;
+        repetier::makeAction( &*client_, "listModels" )
+                .printer( printer.c_str() )
+                .handle( resolveKey( "data" ) )
+                .handle( transform< repetier::Model >( []( auto&& model ) {
+                    return repetier::Model(
+                            model[ Json::StaticString( "id") ].asUInt(),
+                            model[ Json::StaticString( "name" ) ].asString(),
+                            model[ Json::StaticString( "group" ) ].asString() );
+                } ) )
+                .send( std::move( callback ) );
+    }
+
+    void RepetierClient::listModelGroups(
+            std::string const& printer, repetier::Callback< std::vector< repetier::ModelGroup > > callback )
     {
         using namespace repetier::action;
         repetier::makeAction( &*client_, "listModelGroups" )
                 .printer( printer.c_str() )
                 .handle( checkOkFlag() )
                 .handle( resolveKey( "groupNames" ) )
-                .handle( transform< std::string >( []( auto&& groupName ) { return groupName.asString(); } ) )
+                .handle( transform< repetier::ModelGroup >( []( auto&& groupName ) {
+                    return repetier::ModelGroup( groupName.asString() );
+                } ) )
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::addModelGroup( std::string const& printer, std::string const& modelGroup,
-                                        repetier::Callback<> callback )
+    void RepetierClient::addModelGroup(
+            std::string const& printer, std::string const& modelGroup, repetier::Callback<> callback )
     {
         using namespace repetier::action;
         repetier::makeAction( &*client_, "addModelGroup" )
@@ -81,35 +120,57 @@ namespace gcu {
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::moveModelFileToGroup( std::string const& printer, std::string const& modelGroup,
-                                               std::string const& file, repetier::Callback<> callback )
+    void RepetierClient::removeModel( std::string const& printer, unsigned id, repetier::Callback<> callback )
+    {
+        using namespace repetier::action;
+        repetier::makeAction( &*client_, "removeModel" )
+                .printer( printer.c_str() )
+                .arg( "id", id )
+                .send( std::move( callback ) );
+    }
+
+    void RepetierClient::moveModelFileToGroup(
+            std::string const& printer, unsigned id, std::string const& modelGroup,
+            repetier::Callback<> callback )
     {
         using namespace repetier::action;
         repetier::makeAction( &*client_, "moveModelFileToGroup" )
                 .printer( printer.c_str() )
                 .arg( "groupName", modelGroup.c_str() )
-                .arg( "id", file.c_str() )
+                .arg( "id", id )
                 .handle( checkOkFlag() )
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::upload( std::string const& printer, std::string const& name, std::string const& gcodePath,
-                                 repetier::Callback<> callback )
+    void RepetierClient::upload(
+            std::string const& printer, std::string const& modelName, std::string const& modelGroup,
+            std::filesystem::path const& gcodePath, repetier::Callback<> callback )
     {
-        std::ostringstream os;
-        os << "curl -i -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: " << apikey_ << "\" "
-           << "-F \"a=upload\" -F \"filename=@" << gcodePath << "\" " << buildUploadUrl( hostname_, port_, printer );
-        std::string command = os.str();
+        std::string command = util::str(
+                "curl -s -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: ", apikey_, "\" ",
+                "-F \"a=upload\" -F \"name=", modelName, "\" -F \"group=", modelGroup, "\" -F \"filename=@",
+                gcodePath.string(), "\" ", UploadUrl( hostname_, port_, printer ) );
 
-        std::cerr << "INFO: Executing " << command << "\n";
+        std::thread worker(
+                [command = std::move( command ), callback = std::move( callback )] {
+                    auto pipe = popen( command.c_str(), "r" );
+                    char buffer[ 8192 ];
+                    std::size_t count;
+                    do {
+                        count = std::fread( buffer, 1, sizeof( buffer ), pipe );
+                    } while ( count == sizeof( buffer ) );
 
-        auto status = std::system( command.c_str() );
-
-        std::error_code ec;
-        if ( status != 0 ) {
-            ec = std::make_error_code( std::errc::invalid_argument ); // TODO
-        }
-        callback( ec );
+                    std::error_code ec;
+                    if ( ferror( pipe ) ) {
+                        ec = std::make_error_code( std::errc::broken_pipe ); // TODO
+                    }
+                    int status = pclose( pipe );
+                    if ( !ec && status != 0 ) {
+                        ec = std::make_error_code( std::errc::invalid_argument ); // TODO
+                    }
+                    callback( ec );
+                } );
+        worker.detach();
     }
 
 } // namespace gcu
