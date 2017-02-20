@@ -33,8 +33,10 @@ namespace gcu {
         void printerSelected();
         void modelGroupSelected();
         void newModelGroupClicked();
-        void checkModelName();
+        void modelNameTextChanged();
         void uploadClicked();
+
+        void checkModelName();
         void performUpload(
                 std::string const& printer, std::string const& modelName, std::string const& modelGroup,
                 bool deleteFile );
@@ -44,17 +46,13 @@ namespace gcu {
         void handleModelGroupsChanged( std::string const& printer, std::vector< repetier::ModelGroup >&& modelGroups );
         void handleModelsChanged( std::string const& printer, std::vector< repetier::Model >&& models );
 
-        std::string selectedPrinterSlug() const;
-        std::string selectedModelGroup() const;
-        std::string enteredModelName() const;
         unsigned existingModelId( std::string const& modelName, std::string const& modelGroup ) const;
 
         PrinterService& printerService_;
         std::filesystem::path gcodePath_;
-        std::string printer_;
-        std::string modelGroup_;
-        std::vector< repetier::Printer > printers_;
-        std::vector< repetier::ModelGroup > modelGroups_;
+        std::string selectedPrinter_;
+        std::string selectedModelGroup_;
+        std::string enteredModelName_;
         std::vector< repetier::Model > models_;
 
         nana::place place_ { *this };

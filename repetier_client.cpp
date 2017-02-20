@@ -151,6 +151,7 @@ namespace gcu {
                 events_.printersChanged();
             }
             else if ( type == "modelGroupListChanged" ) {
+                std::cerr << "modelGroupListChanged: " << jsonContext_.toString( event ) << "\n";
                 events_.modelGroupsChanged( event[ Json::StaticString( "printer" ) ].asString() );
             }
             else if ( type == "jobsChanged" ) {

@@ -153,8 +153,14 @@ namespace gcu {
         client_.listModelGroups( printer, [this, printer]( auto&& modelGroups, auto ec ) {
             std::lock_guard< std::recursive_mutex > lock( mutex_ );
             if ( this->success( ec ) ) {
-                auto result = modelGroups_.emplace( printer, std::move( modelGroups ) );
-                modelGroupsChanged( printer, result.first->second );
+                auto it = modelGroups_.find( printer );
+                if ( it == modelGroups_.end() ) {
+                    it = modelGroups_.emplace( printer, std::move( modelGroups ) ).first;
+                }
+                else {
+                    it->second = std::move( modelGroups );
+                }
+                modelGroupsChanged( printer, it->second );
             }
         } );
     }
@@ -164,8 +170,14 @@ namespace gcu {
         client_.listModels( printer, [this, printer]( auto&& models, auto ec ) {
             std::lock_guard< std::recursive_mutex > lock( mutex_ );
             if ( this->success( ec ) ) {
-                auto result = models_.emplace( printer, std::move( models ) );
-                modelsChanged( printer, result.first->second );
+                auto it = models_.find( printer );
+                if ( it == models_.end() ) {
+                    it = models_.emplace( printer, std::move( models ) ).first;
+                }
+                else {
+                    it->second = std::move( models );
+                }
+                modelsChanged( printer, it->second );
             }
         } );
     }

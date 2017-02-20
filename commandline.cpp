@@ -12,17 +12,30 @@
 
 namespace gcu {
 
-    template< typename Streamable >
-    static decltype( auto ) usage( Streamable&& streamable, char const* pgmname )
+    struct Usage
     {
-        util::stream(
-                std::forward< Streamable >( streamable ),
-                "Usage: ", pgmname, " [OPTIONS] [ARGUMENTS]\n"
-                "    --host     Hostname of the printer server\n"
-                "    --port     Port of the print server\n"
-                "    --apikey   API key for unrestricted access to the print server\n" );
-        return std::forward< Streamable >( streamable );
-    }
+        Usage( char const* pgmname )
+                : pgmname_( pgmname )
+        {
+        }
+
+        template< typename Stream >
+        decltype( auto ) friend operator<<( Stream&& stream, Usage const& value )
+        {
+            return std::forward< Stream >( stream )
+                    << "Usage: " << value.pgmname_ << " [OPTIONS] GCODEPATH\n"
+                       "Possible OPTIONS:\n"
+                       "    --host HOST     (required) Hostname of the printer server\n"
+                       "    --port PORT     (required) Port of the printer server\n"
+                       "    --apikey KEY    (required) API key for unrestricted access to the print server\n"
+                       "    --printer SLUG  (optional) Printer to initially select\n"
+                       "    --delete        (optional) Whether the GCODEPATH is to be deleted after uploading\n"
+                       "    GCODEPATH       (required) Path to the G-Code file to upload";
+        }
+
+    private:
+        char const* pgmname_;
+    };
 
     static char const* mapShortToLong( int shortopt )
     {
@@ -63,18 +76,20 @@ namespace gcu {
         while ( ( optionChar = getopt_long( argc, argv, ":H:P:p:", options, &optionIndex ) ) != -1 ) {
             switch ( optionChar ) {
                 case ':':
-                    throw std::runtime_error(
-                            util::str( "Missing argument to --", mapShortToLong( optopt ), " (-", (char) optopt ) );
+                    throw std::runtime_error( util::str(
+                            "Missing argument to --", mapShortToLong( optopt ), " (-", (char) optopt, ")\n\n",
+                            Usage( argv[ 0 ] ) ) );
                 case '?':
-                    throw std::runtime_error(
-                            util::str( "unknown option -", (char) optopt ) );
+                    throw std::runtime_error( util::str(
+                            "Invalid option -", (char) optopt, "\n\n", Usage( argv[ 0 ] ) ) );
                 case 'H':
                     hostname_ = optarg;
                     break;
                 case 'P':
                     port_ = boost::convert< std::uint16_t >( optarg, boost::cnv::spirit() ).value_or( 0 );
                     if ( port_ == 0 ) {
-                        throw std::runtime_error( util::str( "argument to --port (-P) requires a numeric argument" ) );
+                        throw std::runtime_error( util::str(
+                                "Argument to --port (-P) must be a valid port number\n\n", Usage( argv[ 0 ] ) ) );
                     }
                     break;
                 case 'a':
@@ -91,17 +106,17 @@ namespace gcu {
         }
 
         if ( hostname_.empty() ) {
-            throw std::runtime_error( "missing option --host (-h)" );
+            throw std::runtime_error( util::str( "Missing required option --host (-h)\n\n", Usage( argv[ 0 ] ) ) );
         }
         if ( port_ == 0 ) {
-            throw std::runtime_error( "missing option --port (-p)" );
+            throw std::runtime_error( util::str( "Missing required option --port (-p)\n\n", Usage( argv[ 0 ] ) ) );
         }
         if ( apikey_.empty() ) {
-            throw std::runtime_error( "missing option --apikey (-a)" );
+            throw std::runtime_error( util::str( "Missing required option --apikey (-a)\n\n", Usage( argv[ 0 ] ) ) );
         }
 
         if ( optind == argc ) {
-            throw std::runtime_error( "missing filename after options" );
+            throw std::runtime_error( util::str( "Missing G-Code file path after last option\n\n", Usage( argv[ 0 ] ) ) );
         }
         gcodeFile_ = argv[ optind++ ];
 
