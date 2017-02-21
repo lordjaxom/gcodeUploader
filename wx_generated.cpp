@@ -78,7 +78,7 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	fgSizer1->Add( modelNameLabel_, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
 	
 	modelNameText_ = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
-	fgSizer1->Add( modelNameText_, 0, wxALL|wxEXPAND, 5 );
+	fgSizer1->Add( modelNameText_, 0, wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
 	
 	
 	bSizer2->Add( fgSizer1, 1, wxEXPAND, 5 );

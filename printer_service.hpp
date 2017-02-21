@@ -42,9 +42,9 @@ namespace gcu {
                 std::filesystem::path const& gcodePath, std::function< void () > callback = {} );
 
         boost::signals2::signal< void ( std::error_code ) > connectionLost;
-        boost::signals2::signal< void ( std::vector< repetier::Printer > ) > printersChanged;
-        boost::signals2::signal< void ( std::string printer, std::vector< repetier::ModelGroup > ) > modelGroupsChanged;
-        boost::signals2::signal< void ( std::string printer, std::vector< repetier::Model > ) > modelsChanged;
+        boost::signals2::signal< void ( std::vector< repetier::Printer > const& ) > printersChanged;
+        boost::signals2::signal< void ( std::string const&, std::vector< repetier::ModelGroup > const& ) > modelGroupsChanged;
+        boost::signals2::signal< void ( std::string const&, std::vector< repetier::Model > const& ) > modelsChanged;
 
     private:
         bool success( std::error_code ec );

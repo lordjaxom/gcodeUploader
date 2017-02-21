@@ -42,9 +42,10 @@ namespace gcu {
                 bool deleteFile );
 
         void handleConnectionLost( std::error_code ec );
-        void handlePrintersChanged( std::vector< repetier::Printer >&& printers );
-        void handleModelGroupsChanged( std::string const& printer, std::vector< repetier::ModelGroup >&& modelGroups );
-        void handleModelsChanged( std::string const& printer, std::vector< repetier::Model >&& models );
+        void handlePrintersChanged( std::vector< repetier::Printer > const& printers );
+        void handleModelGroupsChanged(
+                std::string const& printer, std::vector< repetier::ModelGroup > const& modelGroups );
+        void handleModelsChanged( std::string const& printer, std::vector< repetier::Model > const& models );
 
         unsigned existingModelId( std::string const& modelName, std::string const& modelGroup ) const;
 

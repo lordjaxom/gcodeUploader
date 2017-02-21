@@ -106,13 +106,13 @@ namespace gcu {
         printerService_.connectionLost.connect( [this]( auto ec ) {
             this->handleConnectionLost( ec );
         } );
-        printerService_.printersChanged.connect( [this]( auto&& printers ) {
+        printerService_.printersChanged.connect( [this]( auto const& printers ) {
             this->handlePrintersChanged( std::move( printers ) );
         } );
-        printerService_.modelGroupsChanged.connect( [this]( auto const& printer, auto&& modelGroups ) {
+        printerService_.modelGroupsChanged.connect( [this]( auto const& printer, auto const& modelGroups ) {
             this->handleModelGroupsChanged( printer, std::move( modelGroups ) );
         } );
-        printerService_.modelsChanged.connect( [this]( auto const& printer, auto&& models ) {
+        printerService_.modelsChanged.connect( [this]( auto const& printer, auto const& models ) {
             this->handleModelsChanged( printer, std::move( models ) );
         } );
         printerService_.requestPrinters();
@@ -202,18 +202,18 @@ namespace gcu {
         close();
     }
 
-    void UploaderForm::handlePrintersChanged( std::vector< repetier::Printer >&& printers )
+    void UploaderForm::handlePrintersChanged( std::vector< repetier::Printer > const& printers )
     {
         printerCombox_.clear();
 
         std::size_t selected = 0;
-        for ( auto&& printer : printers ) {
+        for ( auto const& printer : printers ) {
             std::size_t index = printerCombox_.the_number_of_options();
             if ( printer.slug() == selectedPrinter_ ) {
                 selected = index;
             }
             printerCombox_.push_back( printer.name() );
-            printerCombox_.anyobj( index, std::move( printer ) );
+            printerCombox_.anyobj( index, printer );
         }
         if ( !printers.empty() ) {
             printerCombox_.enabled( true );
@@ -225,20 +225,20 @@ namespace gcu {
     }
 
     void UploaderForm::handleModelGroupsChanged(
-            std::string const& printer, std::vector< repetier::ModelGroup >&& modelGroups )
+            std::string const& printer, std::vector< repetier::ModelGroup > const& modelGroups )
     {
         std::cerr << "handleModelGroupsChanged( " << printer << " )\n";
         if ( selectedPrinter_ == printer ) {
             modelGroupCombox_.clear();
 
             std::size_t selected = 0;
-            for ( auto&& modelGroup : modelGroups ) {
+            for ( auto const& modelGroup : modelGroups ) {
                 std::size_t index = modelGroupCombox_.the_number_of_options();
                 if ( modelGroup.name() == selectedModelGroup_ ) {
                     selected = index;
                 }
                 modelGroupCombox_.push_back( modelGroup.defaultGroup() ? "Default" : modelGroup.name() );
-                modelGroupCombox_.anyobj( index, std::move( modelGroup ) );
+                modelGroupCombox_.anyobj( index, modelGroup );
             }
             modelGroupCombox_.enabled( true );
             modelGroupCombox_.option( selected );
@@ -246,7 +246,7 @@ namespace gcu {
         }
     }
 
-    void UploaderForm::handleModelsChanged( std::string const& printer, std::vector< repetier::Model >&& models )
+    void UploaderForm::handleModelsChanged( std::string const& printer, std::vector< repetier::Model > const& models )
     {
         if ( selectedPrinter_ == printer ) {
             models_ = std::move( models );

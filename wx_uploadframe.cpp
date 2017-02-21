@@ -62,16 +62,24 @@ namespace gct {
         uploadButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnUploadClicked(); } );
 
         printerService_->connectionLost.connect( [this]( auto ec ) {
-            this->OnConnectionLost( ec );
+            this->CallAfter( [=] {
+                this->OnConnectionLost( ec );
+            } );
         } );
-        printerService_->printersChanged.connect( [this]( auto&& printers ) {
-            this->OnPrintersChanged( std::move( printers ) );
+        printerService_->printersChanged.connect( [this]( auto const& printers ) {
+            this->CallAfter( [=, printers = printers]() mutable {
+                this->OnPrintersChanged( std::move( printers ) );
+            } );
         } );
-        printerService_->modelGroupsChanged.connect( [this]( auto const& printer, auto&& modelGroups ) {
-            this->OnModelGroupsChanged( printer, std::move( modelGroups ) );
+        printerService_->modelGroupsChanged.connect( [this]( auto const& printer, auto const& modelGroups ) {
+            this->CallAfter( [=, modelGroups = modelGroups]() mutable {
+                this->OnModelGroupsChanged( printer, std::move( modelGroups ) );
+            } );
         } );
-        printerService_->modelsChanged.connect( [this]( auto const& printer, auto&& models ) {
-            this->OnModelsChanged( printer, std::move( models ) );
+        printerService_->modelsChanged.connect( [this]( auto const& printer, auto const& models ) {
+            this->CallAfter( [=, models = models]() mutable {
+                this->OnModelsChanged( printer, std::move( models ) );
+            } );
         } );
         printerService_->requestPrinters();
     }
@@ -194,12 +202,13 @@ namespace gct {
 
             unsigned selected = 0;
             for ( auto&& modelGroup : modelGroups ) {
-                unsigned index = printerChoice_->GetCount();
+                unsigned index = modelGroupChoice_->GetCount();
                 if ( modelGroup.name() == selectedModelGroup_ ) {
                     selected = index;
                 }
                 auto ptr = new wxClientPtr< gcu::repetier::ModelGroup >( std::move( modelGroup ) );
-                modelGroupChoice_->Append( ptr->GetValue().defaultGroup() ? _( "Default" ) : ptr->GetValue().name(), ptr );
+                modelGroupChoice_->Append(
+                        ptr->GetValue().defaultGroup() ? _( "Default" ) : ptr->GetValue().name(), ptr );
             }
             modelGroupChoice_->Enable( true );
             modelGroupChoice_->Select( selected );
