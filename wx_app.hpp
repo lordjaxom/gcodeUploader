@@ -25,6 +25,7 @@ namespace gct {
         wxString apikey_;
         wxString printer_;
         bool deleteFile_;
+        wxString gcodePath_;
     };
 
 } // namespace gct

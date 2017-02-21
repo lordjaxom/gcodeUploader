@@ -28,7 +28,7 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	gcodeFileLabel_->Wrap( -1 );
 	fgSizer1->Add( gcodeFileLabel_, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
 	
-	gcodeFileText_ = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+	gcodeFileText_ = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY );
 	fgSizer1->Add( gcodeFileText_, 0, wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
 	
 	
@@ -44,6 +44,8 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	wxArrayString printerChoice_Choices;
 	printerChoice_ = new wxChoice( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, printerChoice_Choices, 0 );
 	printerChoice_->SetSelection( 0 );
+	printerChoice_->Enable( false );
+	
 	fgSizer1->Add( printerChoice_, 0, wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
 	
 	modelGroupLabel_ = new wxStaticText( this, wxID_ANY, wxT("Model group:"), wxDefaultPosition, wxDefaultSize, 0 );
@@ -59,9 +61,13 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	wxArrayString modelGroupChoice_Choices;
 	modelGroupChoice_ = new wxChoice( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, modelGroupChoice_Choices, 0 );
 	modelGroupChoice_->SetSelection( 0 );
+	modelGroupChoice_->Enable( false );
+	
 	fgSizer2->Add( modelGroupChoice_, 0, wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
 	
 	addModelGroupButton_ = new wxButton( this, wxID_ANY, wxT("+"), wxDefaultPosition, wxDefaultSize, 0 );
+	addModelGroupButton_->Enable( false );
+	
 	fgSizer2->Add( addModelGroupButton_, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
 	
 	
@@ -69,7 +75,7 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	
 	modelNameLabel_ = new wxStaticText( this, wxID_ANY, wxT("Model name:"), wxDefaultPosition, wxDefaultSize, 0 );
 	modelNameLabel_->Wrap( -1 );
-	fgSizer1->Add( modelNameLabel_, 0, wxALL|wxEXPAND, 5 );
+	fgSizer1->Add( modelNameLabel_, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
 	
 	modelNameText_ = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
 	fgSizer1->Add( modelNameText_, 0, wxALL|wxEXPAND, 5 );
@@ -83,13 +89,15 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	fgSizer5->SetFlexibleDirection( wxHORIZONTAL );
 	fgSizer5->SetNonFlexibleGrowMode( wxFLEX_GROWMODE_SPECIFIED );
 	
-	infoLabel_ = new wxStaticText( this, wxID_ANY, wxT("Files will be overwritten"), wxDefaultPosition, wxDefaultSize, 0 );
+	infoLabel_ = new wxStaticText( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
 	infoLabel_->Wrap( -1 );
 	infoLabel_->SetForegroundColour( wxColour( 128, 0, 0 ) );
 	
-	fgSizer5->Add( infoLabel_, 0, wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
+	fgSizer5->Add( infoLabel_, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
 	
 	uploadButton_ = new wxButton( this, wxID_ANY, wxT("Upload"), wxDefaultPosition, wxDefaultSize, 0 );
+	uploadButton_->Enable( false );
+	
 	fgSizer5->Add( uploadButton_, 0, wxALIGN_RIGHT|wxALL, 5 );
 	
 	

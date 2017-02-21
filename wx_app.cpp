@@ -1,9 +1,13 @@
 #include <memory>
 
+#include <boost/convert.hpp>
+#include <boost/convert/spirit.hpp>
+
 #include <wx/cmdline.h>
 
 #include "printer_service.hpp"
 #include <wx/msw/winundef.h>
+
 #include "wx_app.hpp"
 #include "wx_uploadframe.hpp"
 
@@ -19,6 +23,7 @@ namespace gct {
             { wxCMD_LINE_OPTION, _( "p" ), _( "printer" ), _( "Printer that gets selected initially" ),
                     wxCMD_LINE_VAL_STRING },
             { wxCMD_LINE_SWITCH, _( "d" ), _( "delete" ), _( "Whether the G-Code file is to be deleted after uploading" ) },
+            { wxCMD_LINE_PARAM, nullptr, nullptr, _( "Path to the G-Code file to upload" ) },
             { wxCMD_LINE_NONE }
     };
 
@@ -33,7 +38,7 @@ namespace gct {
         auto printerService = std::make_shared< gcu::PrinterService >(
                 hostname_.ToStdString(), port_, apikey_.ToStdString() );
 
-        auto frame = new UploadFrame( printerService );
+        auto frame = new UploadFrame( printerService, gcodePath_.ToStdString(), printer_.ToStdString(), deleteFile_ );
         frame->Show( true );
         return true;
     }
@@ -58,6 +63,9 @@ namespace gct {
             // TODO
             return false;
         }
+        port_ = (std::uint16_t) port;
+
+        gcodePath_ = parser.GetParam( 0 );
 
         return true;
     }
