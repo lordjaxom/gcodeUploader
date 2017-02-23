@@ -9,6 +9,7 @@
 #include <wx/msw/winundef.h>
 
 #include "wx_app.hpp"
+#include "wx_explorerframe.hpp"
 #include "wx_uploadframe.hpp"
 
 namespace gct {
@@ -39,6 +40,7 @@ namespace gct {
                 hostname_.ToStdString(), port_, apikey_.ToStdString() );
 
         auto frame = new UploadFrame( printerService, gcodePath_.ToStdString(), printer_.ToStdString(), deleteFile_ );
+        //auto frame = new ExplorerFrame( printerService );
         frame->Show( true );
         return true;
     }

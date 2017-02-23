@@ -32,7 +32,12 @@ set(GCT_SOURCE_FILES
         wx_generated.h
         wx_resource.rc
         wx_app.cpp
-        wx_app.hpp wx_uploadframe.cpp wx_uploadframe.hpp)
+        wx_app.hpp
+        wx_uploadframe.cpp
+        wx_uploadframe.hpp
+        wx_clientptr.hpp
+        wx_explorerframe.cpp
+        wx_explorerframe.hpp)
 
 set(CMAKE_CXX_STANDARD 14)
 

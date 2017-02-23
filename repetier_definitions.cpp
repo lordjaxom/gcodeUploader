@@ -1,7 +1,6 @@
 #include "repetier_definitions.hpp"
 
 namespace gcu {
-
     namespace repetier {
 
         Printer::Printer( bool active, std::string name, std::string slug )
@@ -11,10 +10,13 @@ namespace gcu {
         {
         }
 
-        Model::Model( unsigned id, std::string name, std::string modelGroup )
+        Model::Model(
+                std::size_t id, std::string name, std::string modelGroup, std::time_t created, std::size_t length )
                 : id_( id )
                 , name_( std::move( name ) )
                 , modelGroup_( std::move( modelGroup ) )
+                , created_( created )
+                , length_( length )
         {
         }
 
@@ -25,5 +27,4 @@ namespace gcu {
         }
 
     } // namespace repetier
-
 } // namespace gcu

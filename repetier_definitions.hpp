@@ -1,6 +1,7 @@
 #ifndef GCODEUPLOADER_REPETIER_DEFINITIONS_HPP
 #define GCODEUPLOADER_REPETIER_DEFINITIONS_HPP
 
+#include <ctime>
 #include <functional>
 #include <string>
 #include <system_error>
@@ -27,16 +28,21 @@ namespace gcu {
         class Model
         {
         public:
-            Model( unsigned id, std::string name, std::string modelGroup );
+            Model(
+                    std::size_t id, std::string name, std::string modelGroup, std::time_t created, std::size_t length );
 
-            unsigned id() const { return id_; }
+            std::size_t id() const { return id_; }
             std::string const& name() const { return name_; }
             std::string const& modelGroup() const { return modelGroup_; }
+            std::time_t const& created() const { return created_; }
+            std::size_t length() const { return length_; }
 
         private:
-            unsigned id_;
+            std::size_t id_;
             std::string name_;
             std::string modelGroup_;
+            std::time_t created_;
+            std::size_t length_;
         };
 
         class ModelGroup

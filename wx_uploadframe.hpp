@@ -20,7 +20,7 @@ namespace gct {
     class UploadFrame
             : public UploadFrameBase
     {
-        static constexpr unsigned MODEL_NOT_FOUND = std::numeric_limits< unsigned >::max();
+        static constexpr std::size_t MODEL_NOT_FOUND = std::numeric_limits< std::size_t >::max();
 
     public:
         UploadFrame(
@@ -30,7 +30,7 @@ namespace gct {
 
     private:
         void CheckModelNameExists();
-        unsigned FindSelectedModelId();
+        std::size_t FindSelectedModelId();
         void PerformUpload(
                 std::string const& printer, std::string const& modelName, std::string const& modelGroup,
                 bool deleteFile );

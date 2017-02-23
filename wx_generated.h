@@ -22,11 +22,18 @@
 #include <wx/button.h>
 #include <wx/sizer.h>
 #include <wx/frame.h>
+#include <wx/listctrl.h>
+#include <wx/gbsizer.h>
+#include <wx/bitmap.h>
+#include <wx/image.h>
+#include <wx/icon.h>
+#include <wx/toolbar.h>
 
 ///////////////////////////////////////////////////////////////////////////
 
 namespace gct
 {
+	#define gctID_REMOVE 1000
 	
 	///////////////////////////////////////////////////////////////////////////////
 	/// Class UploadFrameBase
@@ -54,6 +61,30 @@ namespace gct
 			UploadFrameBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxT("Upload G-Code"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,266 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 			
 			~UploadFrameBase();
+		
+	};
+	
+	///////////////////////////////////////////////////////////////////////////////
+	/// Class ExplorerFrameBase
+	///////////////////////////////////////////////////////////////////////////////
+	class ExplorerFrameBase : public wxFrame 
+	{
+		private:
+		
+		protected:
+			wxStaticText* modelGroupLabel_;
+			wxChoice* modelGroupChoice_;
+			wxListCtrl* modelsListCtrl_;
+			wxStaticText* printerLabel_;
+			wxChoice* printerChoice_;
+			wxToolBar* toolBar_;
+			wxToolBarToolBase* removeTool_; 
+		
+		public:
+			
+			ExplorerFrameBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,300 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+			
+			~ExplorerFrameBase();
 		
 	};
 	

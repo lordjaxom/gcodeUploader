@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <locale>
 #include <utility>
 
 #include <wx/msgdlg.h>
@@ -7,41 +8,10 @@
 #include "printer_service.hpp"
 #include <wx/msw/winundef.h>
 
+#include "wx_clientptr.hpp"
 #include "wx_uploadframe.hpp"
 
 namespace gct {
-
-    template< typename Type >
-    class wxClientPtr
-            : public wxClientData
-    {
-    public:
-        template< typename ...Args >
-        wxClientPtr( Args&&... args )
-                : value_( std::forward< Args >( args )... )
-        {
-        }
-
-        wxClientPtr( wxClientPtr const& ) = delete;
-
-        Type& GetValue() { return value_; }
-        Type const& GetValue() const { return value_; }
-
-    private:
-        Type value_;
-    };
-
-    template< typename Type >
-    Type& wxClientPtrCast( wxClientData* clientData )
-    {
-        return dynamic_cast< wxClientPtr< Type >& >( *clientData ).GetValue();
-    }
-
-    template< typename Type >
-    Type const& wxClientPtrCast( wxClientData const* clientData )
-    {
-        return dynamic_cast< wxClientPtr< Type >& >( *clientData ).GetValue();
-    }
 
     UploadFrame::UploadFrame(
             std::shared_ptr< gcu::PrinterService > printerService, std::filesystem::path gcodePath,
@@ -50,10 +20,11 @@ namespace gct {
             , printerService_( std::move( printerService ) )
             , gcodePath_( std::move( gcodePath ) )
             , selectedPrinter_( std::move( printer ) )
+            , enteredModelName_( gcodePath_.stem().string() )
     {
         gcodeFileText_->SetValue( gcodePath_.filename().string() );
         deleteFileCheckbox_->SetValue( deleteFile );
-        modelNameText_->SetValue( gcodePath_.stem().string() );
+        modelNameText_->SetValue( enteredModelName_ );
 
         printerChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnPrinterSelected(); } );
         modelGroupChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnModelGroupSelected(); } );
@@ -90,7 +61,7 @@ namespace gct {
                 FindSelectedModelId() != MODEL_NOT_FOUND ? _( "Existing G-Code file will be overwritten!" ) : _( "" ) );
     }
 
-    unsigned UploadFrame::FindSelectedModelId()
+    std::size_t UploadFrame::FindSelectedModelId()
     {
         auto it = std::find_if( models_.begin(), models_.end(), [this]( auto const& item ) {
             return item.name() == enteredModelName_ && item.modelGroup() == selectedModelGroup_;
@@ -175,14 +146,13 @@ namespace gct {
     {
         printerChoice_->Clear();
 
-        unsigned selected = 0;
+        int selected = 0;
         for ( auto&& printer : printers ) {
-            unsigned index = printerChoice_->GetCount();
-            if ( printer.slug() == selectedPrinter_ ) {
+            auto ptr = new wxClientPtr< gcu::repetier::Printer >( std::move( printer ) );
+            int index = printerChoice_->Append( ptr->GetValue().name(), ptr );
+            if ( ptr->GetValue().slug() == selectedPrinter_ ) {
                 selected = index;
             }
-            auto ptr = new wxClientPtr< gcu::repetier::Printer >( std::move( printer ) );
-            printerChoice_->Append( ptr->GetValue().name(), ptr );
         }
         if ( !printers.empty() ) {
             printerChoice_->Enable( true );
@@ -200,15 +170,14 @@ namespace gct {
         if ( printer == selectedPrinter_ ) {
             modelGroupChoice_->Clear();
 
-            unsigned selected = 0;
+            int selected = 0;
             for ( auto&& modelGroup : modelGroups ) {
-                unsigned index = modelGroupChoice_->GetCount();
-                if ( modelGroup.name() == selectedModelGroup_ ) {
+                auto ptr = new wxClientPtr< gcu::repetier::ModelGroup >( std::move( modelGroup ) );
+                int index = modelGroupChoice_->Append(
+                        ptr->GetValue().defaultGroup() ? _( "Default" ) : ptr->GetValue().name(), ptr );
+                if ( ptr->GetValue().name() == selectedModelGroup_ ) {
                     selected = index;
                 }
-                auto ptr = new wxClientPtr< gcu::repetier::ModelGroup >( std::move( modelGroup ) );
-                modelGroupChoice_->Append(
-                        ptr->GetValue().defaultGroup() ? _( "Default" ) : ptr->GetValue().name(), ptr );
             }
             modelGroupChoice_->Enable( true );
             modelGroupChoice_->Select( selected );

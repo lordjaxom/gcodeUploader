@@ -113,3 +113,59 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 UploadFrameBase::~UploadFrameBase()
 {
 }
+
+ExplorerFrameBase::ExplorerFrameBase( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style ) : wxFrame( parent, id, title, pos, size, style )
+{
+	this->SetSizeHints( wxDefaultSize, wxDefaultSize );
+	this->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ) );
+	
+	wxGridBagSizer* gbSizer1;
+	gbSizer1 = new wxGridBagSizer( 0, 0 );
+	gbSizer1->SetFlexibleDirection( wxBOTH );
+	gbSizer1->SetNonFlexibleGrowMode( wxFLEX_GROWMODE_SPECIFIED );
+	
+	modelGroupLabel_ = new wxStaticText( this, wxID_ANY, wxT("Model group:"), wxDefaultPosition, wxDefaultSize, 0 );
+	modelGroupLabel_->Wrap( -1 );
+	gbSizer1->Add( modelGroupLabel_, wxGBPosition( 1, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxALL, 5 );
+	
+	wxArrayString modelGroupChoice_Choices;
+	modelGroupChoice_ = new wxChoice( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, modelGroupChoice_Choices, 0 );
+	modelGroupChoice_->SetSelection( 0 );
+	modelGroupChoice_->Enable( false );
+	
+	gbSizer1->Add( modelGroupChoice_, wxGBPosition( 1, 1 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
+	
+	modelsListCtrl_ = new wxListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT );
+	modelsListCtrl_->Enable( false );
+	
+	gbSizer1->Add( modelsListCtrl_, wxGBPosition( 2, 0 ), wxGBSpan( 1, 2 ), wxALL|wxEXPAND, 5 );
+	
+	printerLabel_ = new wxStaticText( this, wxID_ANY, wxT("Printer:"), wxDefaultPosition, wxDefaultSize, 0 );
+	printerLabel_->Wrap( -1 );
+	gbSizer1->Add( printerLabel_, wxGBPosition( 0, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxALL, 5 );
+	
+	wxArrayString printerChoice_Choices;
+	printerChoice_ = new wxChoice( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, printerChoice_Choices, 0 );
+	printerChoice_->SetSelection( 0 );
+	printerChoice_->Enable( false );
+	
+	gbSizer1->Add( printerChoice_, wxGBPosition( 0, 1 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxALL|wxEXPAND, 5 );
+	
+	
+	gbSizer1->AddGrowableCol( 1 );
+	gbSizer1->AddGrowableRow( 2 );
+	
+	this->SetSizer( gbSizer1 );
+	this->Layout();
+	toolBar_ = this->CreateToolBar( wxTB_HORIZONTAL|wxTB_HORZ_TEXT|wxTB_NOICONS, wxID_ANY ); 
+	removeTool_ = toolBar_->AddTool( gctID_REMOVE, wxT("Remove"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL ); 
+	
+	toolBar_->Realize(); 
+	
+	
+	this->Centre( wxBOTH );
+}
+
+ExplorerFrameBase::~ExplorerFrameBase()
+{
+}

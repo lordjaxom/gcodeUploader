@@ -88,9 +88,11 @@ namespace gcu {
                 .handle( resolveKey( "data" ) )
                 .handle( transform< repetier::Model >( []( auto&& model ) {
                     return repetier::Model(
-                            model[ Json::StaticString( "id") ].asUInt(),
+                            model[ Json::StaticString( "id") ].asLargestUInt(),
                             model[ Json::StaticString( "name" ) ].asString(),
-                            model[ Json::StaticString( "group" ) ].asString() );
+                            model[ Json::StaticString( "group" ) ].asString(),
+                            model[ Json::StaticString( "created" ) ].asLargestUInt() / 1000,
+                            model[ Json::StaticString( "length" ) ].asLargestUInt() );
                 } ) )
                 .send( std::move( callback ) );
     }
