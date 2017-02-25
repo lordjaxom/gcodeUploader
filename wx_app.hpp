@@ -11,6 +11,12 @@ namespace gct {
     class GctApp
             : public wxApp
     {
+        enum Command
+        {
+            UPLOAD,
+            EXPLORE
+        };
+
     public:
         GctApp();
         GctApp( GctApp const& ) = delete;
@@ -25,6 +31,7 @@ namespace gct {
         wxString apikey_;
         wxString printer_;
         bool deleteFile_;
+        Command command_;
         wxString gcodePath_;
     };
 

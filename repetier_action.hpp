@@ -75,11 +75,13 @@ namespace gcu {
                 template< typename Callback >
                 void send( Callback&& callback ) &&
                 {
-                    auto handlers = std::move( handlers_ );
-                    client_->sendActionRequest( request_, [callback, handlers] ( auto&& data, std::error_code ec ) {
-                        auto handled = invokeHandlers( std::forward< decltype( data ) >( data ), ec, handlers );
-                        invokeCallback( std::move( handled ), ec, callback );
-                    } );
+                    client_->send(
+                            std::move( request_ ),
+                            [callback = std::move( callback ), handlers = std::move( handlers_ ) ]
+                                    ( auto&& data, std::error_code ec ) {
+                                auto handled = invokeHandlers( std::forward< decltype( data ) >( data ), ec, handlers );
+                                invokeCallback( std::move( handled ), ec, callback );
+                            } );
                 }
 
             private:
@@ -96,25 +98,25 @@ namespace gcu {
                 Action( Client* client, char const* name )
                         : client_( client )
                 {
-                    request_[ Json::StaticString( "action" ) ] = Json::StaticString( name );
+                    request_[ "action" ] = name;
                 }
 
                 Action printer( char const* value ) &&
                 {
-                    request_[ Json::StaticString( "printer" ) ] = Json::StaticString( value );
+                    request_[ "printer" ] = value;
                     return std::move( *this );
                 }
 
                 Action arg( char const* name, char const* value ) &&
                 {
-                    data_[ Json::StaticString( name ) ] = Json::StaticString( value );
+                    data_[ name ] = value;
                     return std::move( *this );
                 }
 
                 template< typename T >
                 Action arg( char const* name, T&& value ) &&
                 {
-                    data_[ Json::StaticString( name ) ] = std::forward< T >( value );
+                    data_[ name ] = std::forward< T >( value );
                     return std::move( *this );
                 }
 
@@ -128,15 +130,17 @@ namespace gcu {
                 template< typename Callback >
                 void send( Callback&& callback )
                 {
-                    client_->sendActionRequest( request_, [callback] ( auto&& data, std::error_code ec ) {
-                        detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
-                    } );
+                    client_->send(
+                            std::move( request_ ),
+                            [callback = std::move( callback ) ] ( auto&& data, std::error_code ec ) {
+                                detail::invokeCallback( std::forward< decltype( data ) >( data ), ec, callback );
+                            } );
                 }
 
             private:
                 Client* client_;
                 Json::Value request_;
-                Json::Value& data_ { request_[ Json::StaticString( "data" ) ] = Json::objectValue };
+                Json::Value& data_ { request_[ "data" ] = Json::objectValue };
             };
 
         } // namespace detail
@@ -152,7 +156,7 @@ namespace gcu {
             inline auto checkOkFlag()
             {
                 return []( Json::Value&& data, std::error_code& ec ) {
-                    if ( !data[ Json::StaticString( "ok" ) ].asBool() ) {
+                    if ( !data[ "ok" ].asBool() ) {
                         ec = std::make_error_code( std::errc::invalid_argument ); // TODO
                     }
                     return std::move( data );
@@ -162,7 +166,7 @@ namespace gcu {
             inline auto resolveKey( char const* key )
             {
                 return [key]( Json::Value&& data, std::error_code& ec ) {
-                    return std::move( data[ Json::StaticString( key ) ] );
+                    return std::move( data[ key ] );
                 };
             }
 

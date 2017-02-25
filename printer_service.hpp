@@ -33,7 +33,7 @@ namespace gcu {
 
         void addModelGroup(
                 std::string const& printer, std::string const& modelGroup, std::function< void () > callback = []{} );
-        void removeModel( std::string const& printer, unsigned id, std::function< void () > callback = {} );
+        void removeModel( std::string const& printer, std::size_t id, std::function< void () > callback = {} );
         void moveModelToGroup(
                 std::string const& printer, unsigned modelId, std::string const& modelGroup,
                 std::function< void () > callback = {} );

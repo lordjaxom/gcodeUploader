@@ -72,9 +72,9 @@ namespace gcu {
         using namespace repetier::action;
         repetier::makeAction( &*client_, "listPrinter" )
                 .handle( transform< repetier::Printer >( []( auto&& printer ) {
-                    return repetier::Printer( printer[Json::StaticString( "active" )].asBool(),
-                                              printer[Json::StaticString( "name" )].asString(),
-                                              printer[Json::StaticString( "slug" )].asString());
+                    return repetier::Printer( printer[ "active" ].asBool(),
+                                              printer[ "name" ].asString(),
+                                              printer[ "slug" ].asString());
                 } ) )
                 .send( std::move( callback ) );
     }
@@ -88,11 +88,11 @@ namespace gcu {
                 .handle( resolveKey( "data" ) )
                 .handle( transform< repetier::Model >( []( auto&& model ) {
                     return repetier::Model(
-                            model[ Json::StaticString( "id") ].asLargestUInt(),
-                            model[ Json::StaticString( "name" ) ].asString(),
-                            model[ Json::StaticString( "group" ) ].asString(),
-                            model[ Json::StaticString( "created" ) ].asLargestUInt() / 1000,
-                            model[ Json::StaticString( "length" ) ].asLargestUInt() );
+                            model[ "id" ].asLargestUInt(),
+                            model[ "name" ].asString(),
+                            model[ "group" ].asString(),
+                            model[ "created" ].asLargestUInt() / 1000,
+                            model[ "length" ].asLargestUInt() );
                 } ) )
                 .send( std::move( callback ) );
     }
@@ -122,7 +122,7 @@ namespace gcu {
                 .send( std::move( callback ) );
     }
 
-    void RepetierClient::removeModel( std::string const& printer, unsigned id, repetier::Callback<> callback )
+    void RepetierClient::removeModel( std::string const& printer, std::size_t id, repetier::Callback<> callback )
     {
         using namespace repetier::action;
         repetier::makeAction( &*client_, "removeModel" )

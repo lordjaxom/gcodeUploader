@@ -33,24 +33,31 @@ namespace gcu {
             close( false );
         }
 
-        void Client::connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
-                              ConnectHandler&& handler )
+        void Client::connect(
+                std::string const& hostname, std::uint16_t port, std::string const& apikey,
+                ConnectHandler&& handler )
         {
-            if (status_ != CLOSED ) {
+            if ( status_ != CLOSED ) {
                 throw std::invalid_argument( "connect() called on an already connected client" );
             }
 
-            std::error_code ec;
-            auto connection = wsclient_.get_connection( buildSocketUrl( hostname, port ), ec );
-            if ( ec ) {
-                handler( ec );
-                return;
-            }
-
+            hostname_ = &hostname;
+            port_ = port;
             apikey_ = &apikey;
             connectHandler_ = std::move( handler );
 
-            using namespace std::placeholders;
+            connect();
+        }
+
+        void Client::connect()
+        {
+            std::error_code ec;
+            auto connection = wsclient_.get_connection( buildSocketUrl( *hostname_, port_ ), ec );
+            if ( ec ) {
+                propagateError( ec );
+                return;
+            }
+
             connection->set_open_handler( [this] ( auto&& ) { this->handleOpen(); } );
             connection->set_fail_handler( [this] ( auto&& ) { this->handleFail(); } );
             connection->set_close_handler( [this] ( auto&& ) { this->handleClose(); } );
@@ -61,6 +68,26 @@ namespace gcu {
             status_ = CONNECTING;
             wshandle_ = connection->get_handle();
             wsclient_.connect( connection );
+        }
+
+        bool Client::reconnect()
+        {
+            if ( errorCount_ >= retryCount_ ) {
+                return false;
+            }
+
+            std::lock_guard< std::recursive_mutex > lock( actionMutex_ );
+
+            std::cerr << "INFO: trying to reconnect to " << *hostname_ << ":" << port_ << "\n";
+
+            ++errorCount_;
+            if ( !actionQueue_.empty() ) {
+                actionQueue_.front().pending = false;
+            }
+            status_ = CLOSED;
+            connect();
+
+            return true;
         }
 
         void Client::close()
@@ -83,16 +110,24 @@ namespace gcu {
                         else {
                             std::cerr << "INFO: Login successful, connection ready\n";
                             status_ = CONNECTED;
+                            errorCount_ = 0;
                         }
-                        connectHandler_( ec );
+                        if ( connectHandler_ ) {
+                            connectHandler_( ec );
+                            connectHandler_ = nullptr;
+                        }
                     } );
         }
 
         void Client::handleFail()
         {
             auto connection = wsclient_.get_con_from_hdl( wshandle_ );
+
             std::cerr << "ERROR: Connection failed: " << connection->get_ec() << "\n";
-            connectHandler_( connection->get_ec() );
+
+            if ( !reconnect() ) {
+                propagateError( connection->get_ec() );
+            }
         }
 
         void Client::handleClose()
@@ -102,6 +137,10 @@ namespace gcu {
                 std::cerr << "ERROR: Connection closed by server: code "
                           << websocketpp::close::status::get_string( connection->get_remote_close_code())
                           << ", reason: " << connection->get_remote_close_reason() << "\n";
+
+                if ( reconnect() ) {
+                    return;
+                }
             }
             status_ = CLOSED;
             propagateError( std::make_error_code( std::errc::invalid_argument ) ); // TODO
@@ -109,14 +148,15 @@ namespace gcu {
 
         void Client::handleMessage( websocketclient::message_ptr message )
         {
+            std::cerr << "<<< " << message->get_payload().substr( 0, 80 ) << "\n";
+
             auto response = jsonContext_.toJson( message->get_payload() );
-            auto callbackId = response[ Json::StaticString( "callback_id" ) ].asLargestInt();
+            auto callbackId = response[ "callback_id" ].asLargestInt();
             if ( callbackId != -1 ) {
-                // std::cerr << "<<< " << message->get_payload() << "\n";
                 handleActionResponse( callbackId, std::move( response ) );
             }
-            else if ( response[ Json::StaticString( "eventList" ) ].asBool() ) {
-                auto& eventList = response[ Json::StaticString( "data" ) ];
+            else if ( response[ "eventList" ].asBool() ) {
+                auto& eventList = response[ "data" ];
                 std::for_each( eventList.begin(), eventList.end(), [this]( auto&& event ) {
                     this->handleEvent( std::move( event ) );
                 } );
@@ -128,47 +168,57 @@ namespace gcu {
 
         void Client::handleActionResponse( std::intmax_t callbackId, Json::Value&& response )
         {
-            auto it = actionHandlers_.find( callbackId );
-            if ( it == actionHandlers_.end() ) {
-                std::cerr << "WARN: Received response to unrequested callback " << callbackId << ", ignoring message\n";
-                return;
+            std::lock_guard< std::recursive_mutex > lock( actionMutex_ );
+
+            if ( !actionQueue_.empty() ) {
+                auto& action = actionQueue_.front();
+                if ( action.pending && action.callbackId == callbackId ) {
+                    action.handler( std::move( response[ "data" ] ), {} );
+                    actionQueue_.pop_front();
+                    return sendIfReady();
+                }
             }
 
-            auto& session = response[ Json::StaticString( "session" ) ];
-            if ( !session.isNull() ) {
-                session_ = session.asString();
-            }
-
-            auto handler = std::move( it->second );
-            actionHandlers_.erase( it );
-            handler( std::move( response[ Json::StaticString( "data" ) ] ), {} );
+            std::cerr << "WARN: Received response to unrequested callback " << callbackId << ", ignoring message\n";
         }
 
         void Client::handleEvent( Json::Value&& event )
         {
-            auto type = event[ Json::StaticString( "event" ) ];
+            auto type = event[ "event" ];
             if ( type == "printerListChanged" ) {
                 events_.printersChanged();
             }
             else if ( type == "modelGroupListChanged" ) {
-                events_.modelGroupsChanged( event[ Json::StaticString( "printer" ) ].asString() );
+                events_.modelGroupsChanged( event[ "printer" ].asString() );
             }
             else if ( type == "jobsChanged" ) {
-                events_.modelsChanged( event[ Json::StaticString( "printer" ) ].asString() );
+                events_.modelsChanged( event[ "printer" ].asString() );
             }
         }
 
-        void Client::sendActionRequest( Json::Value& request, ActionHandler&& handler )
+        void Client::send( Json::Value&& request, ActionHandler&& handler )
         {
-            auto callbackId = ++nextCallbackId_;
-            request[ Json::StaticString( "callback_id" ) ] = callbackId;
+            std::lock_guard< std::recursive_mutex > lock( actionMutex_ );
 
-            auto message = jsonContext_.toString( request );
-            // std::cerr << ">>> " << message << "\n";
+            auto it = request[ "action" ].asString() == "login" ? actionQueue_.begin() : actionQueue_.end();
+            actionQueue_.emplace( it, ++nextCallbackId_, std::move( request ), std::move( handler ) );
+            sendIfReady();
+        }
 
-            auto connection = wsclient_.get_con_from_hdl( wshandle_ );
-            connection->send( message, websocketpp::frame::opcode::text );
-            actionHandlers_.emplace( callbackId, std::move( handler ) );
+        void Client::sendIfReady()
+        {
+            if ( !actionQueue_.empty() ) {
+                auto& action = actionQueue_.front();
+                if ( !action.pending ) {
+                    auto message = jsonContext_.toString( action.request );
+                    std::cerr << ">>> " << message.substr( 0, 80 ) << "\n";
+
+                    auto connection = wsclient_.get_con_from_hdl( wshandle_ );
+                    connection->send( message, websocketpp::frame::opcode::text );
+
+                    action.pending = true;
+                }
+            }
         }
 
         void Client::close( bool checked )
@@ -203,9 +253,16 @@ namespace gcu {
 
         void Client::propagateError( std::error_code ec )
         {
-            std::for_each( actionHandlers_.begin(), actionHandlers_.end(),
-                           [ec]( auto const& entry ) { entry.second( {}, ec ); } );
-            actionHandlers_.clear();
+            std::lock_guard< std::recursive_mutex > lock( actionMutex_ );
+
+            if ( connectHandler_ ) {
+                connectHandler_( ec );
+            }
+
+            std::for_each( actionQueue_.begin(), actionQueue_.end(), [&]( auto& action ) {
+                action.handler( {}, ec );
+            } );
+            actionQueue_.clear();
         }
 
     } // namespace repetier

@@ -2,10 +2,12 @@
 #define GCODEUPLOADER_REPETIER_CLIENT_HPP
 
 #include <cstdint>
+#include <list>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <type_traits>
-#include <unordered_map>
+#include <vector>
 
 #include <asio/io_service.hpp>
 
@@ -13,6 +15,8 @@
 
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
+
+#include "std_optional.hpp"
 
 #include "json.hpp"
 #include "repetier_definitions.hpp"
@@ -42,6 +46,22 @@ namespace gcu {
                 CLOSING
             };
 
+            struct Action
+            {
+                Action( std::intmax_t callbackId, Json::Value&& request, ActionHandler&& handler )
+                        : callbackId( callbackId )
+                        , request( std::move( request ) )
+                        , handler( std::move( handler ) )
+                {
+                    this->request[ "callback_id" ] = callbackId;
+                }
+
+                std::intmax_t callbackId;
+                Json::Value request;
+                ActionHandler handler;
+                bool pending {};
+            };
+
         public:
             Client( asio::io_service& service );
             Client( Client const& ) = delete;
@@ -50,10 +70,13 @@ namespace gcu {
             bool closed() const { return status_ == CLOSED; }
             bool connected() const { return status_ == CONNECTED; }
 
-            void connect( std::string const& hostname, std::uint16_t port, std::string const& apikey,
-                          ConnectHandler&& handler );
+            void retry( std::size_t retryCount ) { retryCount_ = retryCount; }
+
+            void connect(
+                    std::string const& hostname, std::uint16_t port, std::string const& apikey,
+                    ConnectHandler&& handler );
             void close();
-            void sendActionRequest( Json::Value& request, ActionHandler&& handler );
+            void send( Json::Value&& request, ActionHandler&& handler );
 
             ClientEvents& events() { return events_; }
 
@@ -65,19 +88,27 @@ namespace gcu {
             void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
             void handleEvent( Json::Value&& event );
 
+            bool reconnect();
+            void connect();
+            void sendIfReady();
             void close( bool checked );
             void forceClose();
 
             void propagateError( std::error_code ec );
 
+            std::size_t retryCount_;
+            std::size_t errorCount_;
             websocketclient wsclient_;
             websocketpp::connection_hdl wshandle_;
             Status status_ { CLOSED };
-            std::intmax_t nextCallbackId_ {};
+            std::string const* hostname_;
+            std::uint16_t port_;
             std::string const* apikey_;
             ConnectHandler connectHandler_;
-            std::string session_;
-            std::unordered_map< std::intmax_t, ActionHandler > actionHandlers_;
+            std::intmax_t loginCallbackId_;
+            std::intmax_t nextCallbackId_ {};
+            std::list< Action > actionQueue_;
+            std::recursive_mutex actionMutex_;
             ClientEvents events_;
             JsonContext jsonContext_;
         };

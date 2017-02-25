@@ -4,6 +4,7 @@
 #include <boost/convert/spirit.hpp>
 
 #include <wx/cmdline.h>
+#include <wx/msgdlg.h>
 
 #include "printer_service.hpp"
 #include <wx/msw/winundef.h>
@@ -24,7 +25,8 @@ namespace gct {
             { wxCMD_LINE_OPTION, _( "p" ), _( "printer" ), _( "Printer that gets selected initially" ),
                     wxCMD_LINE_VAL_STRING },
             { wxCMD_LINE_SWITCH, _( "d" ), _( "delete" ), _( "Whether the G-Code file is to be deleted after uploading" ) },
-            { wxCMD_LINE_PARAM, nullptr, nullptr, _( "Path to the G-Code file to upload" ) },
+            { wxCMD_LINE_PARAM, nullptr, nullptr, _( "Commands and parameters" ),
+                    wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
             { wxCMD_LINE_NONE }
     };
 
@@ -39,8 +41,16 @@ namespace gct {
         auto printerService = std::make_shared< gcu::PrinterService >(
                 hostname_.ToStdString(), port_, apikey_.ToStdString() );
 
-        auto frame = new UploadFrame( printerService, gcodePath_.ToStdString(), printer_.ToStdString(), deleteFile_ );
-        //auto frame = new ExplorerFrame( printerService );
+        wxFrame* frame;
+        switch ( command_ ) {
+            case UPLOAD:
+                frame = new UploadFrame(
+                        printerService, gcodePath_.ToStdString(), printer_.ToStdString(), deleteFile_ );
+                break;
+            case EXPLORE:
+                frame = new ExplorerFrame( printerService );
+                break;
+        }
         frame->Show( true );
         return true;
     }
@@ -67,8 +77,27 @@ namespace gct {
         }
         port_ = (std::uint16_t) port;
 
-        gcodePath_ = parser.GetParam( 0 );
-
+        if ( parser.GetParamCount() > 0 ) {
+            wxString command = parser.GetParam( 0 );
+            if ( command == _( "upload" ) ) {
+                if ( parser.GetParamCount() != 2 ) {
+                    wxMessageBox( _( "The command upload requires a filename" ), _( "Error" ), wxOK | wxICON_ERROR );
+                    return false;
+                }
+                command_ = UPLOAD;
+                gcodePath_ = parser.GetParam( 1 );
+            }
+            else if ( command == _( "explore" ) ) {
+                command_ = EXPLORE;
+            }
+            else {
+                wxMessageBox( _( "Unknown command " ) + command, _( "Error" ), wxOK | wxICON_ERROR );
+                return false;
+            }
+        }
+        else {
+            command_ = EXPLORE;
+        }
         return true;
     }
 

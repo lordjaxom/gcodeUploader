@@ -30,9 +30,11 @@ namespace gct {
             : ExplorerFrameBase( nullptr )
             , printerService_( std::move( printerService ) )
     {
-        modelsListCtrl_->AppendColumn( _( "Model" ) );
-        modelsListCtrl_->AppendColumn( _( "Uploaded" ) );
-        modelsListCtrl_->AppendColumn( _( "Size" ) );
+        modelsListCtrl_->AppendColumn( _( "Model" ), wxLIST_FORMAT_LEFT, 200 );
+        modelsListCtrl_->AppendColumn( _( "Uploaded" ), wxLIST_FORMAT_LEFT, 100 );
+        modelsListCtrl_->AppendColumn( _( "Size" ), wxLIST_FORMAT_LEFT, 100 );
+        modelsListCtrl_->AppendColumn( _( "Lines" ), wxLIST_FORMAT_LEFT, 50 );
+        modelsListCtrl_->AppendColumn( _( "Layers" ), wxLIST_FORMAT_LEFT, 50 );
 
         printerChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnPrinterSelected(); } );
         modelGroupChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnModelGroupSelected(); } );
@@ -71,6 +73,7 @@ namespace gct {
         if ( selection != wxNOT_FOUND ) {
             selectedPrinter_ = wxClientPtrCast< gcu::repetier::Printer >(
                     printerChoice_->GetClientObject( (unsigned) selection ) ).slug();
+            std::cerr << "selected printer is " << selectedPrinter_ << "\n";
             printerService_->requestModelGroups( selectedPrinter_ );
         }
     }
@@ -107,7 +110,9 @@ namespace gct {
         if ( wxMessageBox(
                 gcu::util::str( "Really remove ", selectedModels_.size(), " models?" ), _( "Question" ),
                 wxYES_NO | wxICON_QUESTION, this ) == wxYES ) {
-
+            std::for_each( selectedModels_.begin(), selectedModels_.end(), [this]( auto id ) {
+                printerService_->removeModel( selectedPrinter_, id );
+            } );
         }
     }
 
@@ -172,6 +177,7 @@ namespace gct {
                     modelsListCtrl_->SetItem(
                             index, 1, gcu::util::str( std::put_time( std::localtime( &model.created() ), "%c" ) ) );
                     modelsListCtrl_->SetItem( index, 2, formatFileSize( model.length() ) );
+                    modelsListCtrl_->SetItem( index, 3, std::to_string( model.id() ) );
                     if ( selectedModels_.find( model.id() ) != selectedModels_.end() ) {
                         modelsListCtrl_->SetItemState( index, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED );
                     }

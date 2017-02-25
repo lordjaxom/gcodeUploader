@@ -16,6 +16,7 @@ namespace gcu {
             this->listModelGroups( printer );
         } );
         client_.events().modelsChanged.connect( [this]( auto const& printer ) {
+            std::cerr << "models changed for printer " << printer << "\n";
             this->listModels( printer );
         } );
 
@@ -69,7 +70,7 @@ namespace gcu {
         } );
     }
 
-    void PrinterService::removeModel( std::string const& printer, unsigned id, std::function< void() > callback )
+    void PrinterService::removeModel( std::string const& printer, std::size_t id, std::function< void() > callback )
     {
         client_.removeModel( printer, id, [this, callback = std::move( callback )]( auto ec ) {
             std::lock_guard< std::recursive_mutex > lock( mutex_ );
@@ -167,6 +168,7 @@ namespace gcu {
 
     void PrinterService::listModels( std::string const& printer )
     {
+        std::cerr << "listing models for printer " << printer << "\n";
         client_.listModels( printer, [this, printer]( auto&& models, auto ec ) {
             std::lock_guard< std::recursive_mutex > lock( mutex_ );
             if ( this->success( ec ) ) {

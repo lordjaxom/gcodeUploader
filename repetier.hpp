@@ -32,7 +32,7 @@ namespace gcu {
         void listModels( std::string const& printer, repetier::Callback< std::vector< repetier::Model > > callback );
         void listModelGroups( std::string const& printer, repetier::Callback< std::vector< repetier::ModelGroup > > callback );
         void addModelGroup( std::string const& printer, std::string const& modelGroup, repetier::Callback<> callback );
-        void removeModel( std::string const& printer, unsigned id, repetier::Callback<> callback );
+        void removeModel( std::string const& printer, std::size_t id, repetier::Callback<> callback );
         void moveModelFileToGroup(
                 std::string const& printer, unsigned id, std::string const& modelGroup,
                 repetier::Callback<> callback );
