@@ -158,7 +158,11 @@ ExplorerFrameBase::ExplorerFrameBase( wxWindow* parent, wxWindowID id, const wxS
 	this->SetSizer( gbSizer1 );
 	this->Layout();
 	toolBar_ = this->CreateToolBar( wxTB_HORIZONTAL|wxTB_HORZ_TEXT|wxTB_NOICONS, wxID_ANY ); 
-	removeTool_ = toolBar_->AddTool( gctID_REMOVE, wxT("Remove"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL ); 
+	removeModelsTool_ = toolBar_->AddTool( gctID_REMOVE_MODELS, wxT("Remove models"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL ); 
+	
+	newGroupTool_ = toolBar_->AddTool( gctID_NEW_GROUP, wxT("New group"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL ); 
+	
+	removeGroupTool_ = toolBar_->AddTool( gctID_REMOVE_GROUP, wxT("Remove group"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL ); 
 	
 	toolBar_->Realize(); 
 	

@@ -23,11 +23,17 @@ namespace gct {
         ExplorerFrame( ExplorerFrame const& ) = delete;
 
     private:
+        void RefreshControlStates();
+        void InvalidateModelGroup();
+        void InvalidateModels();
+
         void OnPrinterSelected();
         void OnModelGroupSelected();
         void OnModelsListContextMenu();
         void OnModelsListItemSelected();
-        void OnToolBarRemove();
+        void OnToolBarRemoveModels();
+        void OnToolBarNewGroup();
+        void OnToolBarRemoveGroup();
 
         void OnConnectionLost( std::error_code ec );
         void OnPrintersChanged( std::vector< gcu::repetier::Printer >&& printers );
@@ -39,6 +45,7 @@ namespace gct {
         std::string selectedModelGroup_;
         std::unordered_map< long, gcu::repetier::Model > models_;
         std::unordered_set< std::size_t > selectedModels_;
+
     };
 
 } // namespace gct

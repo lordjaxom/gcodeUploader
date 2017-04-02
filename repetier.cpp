@@ -92,7 +92,10 @@ namespace gcu {
                             model[ "name" ].asString(),
                             model[ "group" ].asString(),
                             model[ "created" ].asLargestUInt() / 1000,
-                            model[ "length" ].asLargestUInt() );
+                            model[ "length" ].asLargestUInt(),
+                            model[ "layer" ].asLargestUInt(),
+                            model[ "lines" ].asLargestUInt(),
+                            std::chrono::milliseconds( (std::uint64_t) ( model[ "printTime" ].asDouble() * 1000.0 ) ) );
                 } ) )
                 .send( std::move( callback ) );
     }
@@ -118,6 +121,18 @@ namespace gcu {
         repetier::makeAction( &*client_, "addModelGroup" )
                 .printer( printer.c_str() )
                 .arg( "groupName", modelGroup.c_str() )
+                .handle( checkOkFlag() )
+                .send( std::move( callback ) );
+    }
+
+    void RepetierClient::delModelGroup( std::string const& printer, std::string const& modelGroup, bool deleteModels,
+                                        repetier::Callback<> callback )
+    {
+        using namespace repetier::action;
+        repetier::makeAction( &*client_, "delModelGroup" )
+                .printer( printer.c_str() )
+                .arg( "groupName", modelGroup.c_str() )
+                .arg( "delFiles", deleteModels )
                 .handle( checkOkFlag() )
                 .send( std::move( callback ) );
     }

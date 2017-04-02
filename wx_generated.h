@@ -33,7 +33,9 @@
 
 namespace gct
 {
-	#define gctID_REMOVE 1000
+	#define gctID_REMOVE_MODELS 1000
+	#define gctID_NEW_GROUP 1001
+	#define gctID_REMOVE_GROUP 1002
 	
 	///////////////////////////////////////////////////////////////////////////////
 	/// Class UploadFrameBase
@@ -78,7 +80,9 @@ namespace gct
 			wxStaticText* printerLabel_;
 			wxChoice* printerChoice_;
 			wxToolBar* toolBar_;
-			wxToolBarToolBase* removeTool_; 
+			wxToolBarToolBase* removeModelsTool_; 
+			wxToolBarToolBase* newGroupTool_; 
+			wxToolBarToolBase* removeGroupTool_; 
 		
 		public:
 			

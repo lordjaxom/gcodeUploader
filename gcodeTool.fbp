@@ -1814,10 +1814,52 @@
                 <object class="tool" expanded="1">
                     <property name="bitmap"></property>
                     <property name="context_menu">0</property>
-                    <property name="id">gctID_REMOVE</property>
+                    <property name="id">gctID_REMOVE_MODELS</property>
                     <property name="kind">wxITEM_NORMAL</property>
-                    <property name="label">Remove</property>
-                    <property name="name">removeTool_</property>
+                    <property name="label">Remove models</property>
+                    <property name="name">removeModelsTool_</property>
+                    <property name="permission">protected</property>
+                    <property name="statusbar"></property>
+                    <property name="tooltip"></property>
+                    <event name="OnAuiToolBarBeginDrag"></event>
+                    <event name="OnAuiToolBarMiddleClick"></event>
+                    <event name="OnAuiToolBarOverflowClick"></event>
+                    <event name="OnAuiToolBarRightClick"></event>
+                    <event name="OnAuiToolBarToolDropDown"></event>
+                    <event name="OnMenuSelection"></event>
+                    <event name="OnToolClicked"></event>
+                    <event name="OnToolEnter"></event>
+                    <event name="OnToolRClicked"></event>
+                    <event name="OnUpdateUI"></event>
+                </object>
+                <object class="tool" expanded="1">
+                    <property name="bitmap"></property>
+                    <property name="context_menu">0</property>
+                    <property name="id">gctID_NEW_GROUP</property>
+                    <property name="kind">wxITEM_NORMAL</property>
+                    <property name="label">New group</property>
+                    <property name="name">newGroupTool_</property>
+                    <property name="permission">protected</property>
+                    <property name="statusbar"></property>
+                    <property name="tooltip"></property>
+                    <event name="OnAuiToolBarBeginDrag"></event>
+                    <event name="OnAuiToolBarMiddleClick"></event>
+                    <event name="OnAuiToolBarOverflowClick"></event>
+                    <event name="OnAuiToolBarRightClick"></event>
+                    <event name="OnAuiToolBarToolDropDown"></event>
+                    <event name="OnMenuSelection"></event>
+                    <event name="OnToolClicked"></event>
+                    <event name="OnToolEnter"></event>
+                    <event name="OnToolRClicked"></event>
+                    <event name="OnUpdateUI"></event>
+                </object>
+                <object class="tool" expanded="1">
+                    <property name="bitmap"></property>
+                    <property name="context_menu">0</property>
+                    <property name="id">gctID_REMOVE_GROUP</property>
+                    <property name="kind">wxITEM_NORMAL</property>
+                    <property name="label">Remove group</property>
+                    <property name="name">removeGroupTool_</property>
                     <property name="permission">protected</property>
                     <property name="statusbar"></property>
                     <property name="tooltip"></property>
