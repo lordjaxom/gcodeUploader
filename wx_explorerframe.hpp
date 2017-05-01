@@ -19,7 +19,8 @@ namespace gct {
             : public ExplorerFrameBase
     {
     public:
-        ExplorerFrame( std::shared_ptr< gcu::PrinterService > printerService );
+        ExplorerFrame( wxWindow* parent, std::shared_ptr< gcu::PrinterService > printerService );
+        explicit ExplorerFrame( std::shared_ptr< gcu::PrinterService > printerService );
         ExplorerFrame( ExplorerFrame const& ) = delete;
 
     private:

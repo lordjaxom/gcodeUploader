@@ -25,14 +25,14 @@ namespace gct {
     public:
         UploadFrame(
                 std::shared_ptr< gcu::PrinterService > printerService, std::filesystem::path gcodePath,
-                std::string printer, bool deleteFile );
+                wxString printer, wxString modelName, bool deleteFile );
         UploadFrame( UploadFrame const& ) = delete;
 
     private:
         void CheckModelNameExists();
         std::size_t FindSelectedModelId();
         void PerformUpload(
-                std::string const& printer, std::string const& modelName, std::string const& modelGroup,
+                wxString const& printer, wxString const& modelName, wxString const& modelGroup,
                 bool deleteFile );
 
         void OnPrinterSelected();
@@ -40,6 +40,7 @@ namespace gct {
         void OnAddModelGroupClicked();
         void OnModelNameChanged();
         void OnUploadClicked();
+        void OnToolBarExplore();
 
         void OnConnectionLost( std::error_code ec );
         void OnPrintersChanged( std::vector< gcu::repetier::Printer >&& printers );
@@ -48,9 +49,9 @@ namespace gct {
 
         std::shared_ptr< gcu::PrinterService > printerService_;
         std::filesystem::path gcodePath_;
-        std::string selectedPrinter_;
-        std::string selectedModelGroup_;
-        std::string enteredModelName_;
+        wxString selectedPrinter_;
+        wxString selectedModelGroup_;
+        wxString enteredModelName_;
         std::vector< gcu::repetier::Model > models_;
     };
 

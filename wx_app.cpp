@@ -24,6 +24,8 @@ namespace gct {
                     wxCMD_LINE_VAL_STRING, wxCMD_LINE_OPTION_MANDATORY },
             { wxCMD_LINE_OPTION, _( "p" ), _( "printer" ), _( "Printer that gets selected initially" ),
                     wxCMD_LINE_VAL_STRING },
+            { wxCMD_LINE_OPTION, _( "m" ), _( "modelname" ), _( "Suggestion for model name" ),
+                    wxCMD_LINE_VAL_STRING },
             { wxCMD_LINE_SWITCH, _( "d" ), _( "delete" ), _( "Whether the G-Code file is to be deleted after uploading" ) },
             { wxCMD_LINE_PARAM, nullptr, nullptr, _( "Commands and parameters" ),
                     wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
@@ -44,8 +46,7 @@ namespace gct {
         wxFrame* frame;
         switch ( command_ ) {
             case UPLOAD:
-                frame = new UploadFrame(
-                        printerService, gcodePath_.ToStdString(), printer_.ToStdString(), deleteFile_ );
+                frame = new UploadFrame( printerService, gcodePath_.ToStdString(), printer_, modelName_, deleteFile_ );
                 break;
             case EXPLORE:
                 frame = new ExplorerFrame( printerService );
@@ -66,6 +67,7 @@ namespace gct {
         parser.Found( _( "H" ), &hostname_ );
         parser.Found( _( "a" ), &apikey_ );
         parser.Found( _( "p" ), &printer_ );
+        parser.Found( _( "m" ), &modelName_ );
         deleteFile_ = parser.Found( _( "d" ) );
 
         long port;

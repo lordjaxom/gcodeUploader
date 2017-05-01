@@ -106,6 +106,11 @@ UploadFrameBase::UploadFrameBase( wxWindow* parent, wxWindowID id, const wxStrin
 	
 	this->SetSizer( bSizer2 );
 	this->Layout();
+	toolBar_ = this->CreateToolBar( wxTB_HORIZONTAL|wxTB_HORZ_TEXT|wxTB_NOICONS, wxID_ANY ); 
+	exploreTool_ = toolBar_->AddTool( gctID_EXPLORE, wxT("Explore..."), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL ); 
+	
+	toolBar_->Realize(); 
+	
 	
 	this->Centre( wxBOTH );
 }

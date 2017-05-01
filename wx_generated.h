@@ -21,21 +21,22 @@
 #include <wx/choice.h>
 #include <wx/button.h>
 #include <wx/sizer.h>
-#include <wx/frame.h>
-#include <wx/listctrl.h>
-#include <wx/gbsizer.h>
 #include <wx/bitmap.h>
 #include <wx/image.h>
 #include <wx/icon.h>
 #include <wx/toolbar.h>
+#include <wx/frame.h>
+#include <wx/listctrl.h>
+#include <wx/gbsizer.h>
 
 ///////////////////////////////////////////////////////////////////////////
 
 namespace gct
 {
-	#define gctID_REMOVE_MODELS 1000
-	#define gctID_NEW_GROUP 1001
-	#define gctID_REMOVE_GROUP 1002
+	#define gctID_EXPLORE 1000
+	#define gctID_REMOVE_MODELS 1001
+	#define gctID_NEW_GROUP 1002
+	#define gctID_REMOVE_GROUP 1003
 	
 	///////////////////////////////////////////////////////////////////////////////
 	/// Class UploadFrameBase
@@ -57,6 +58,8 @@ namespace gct
 			wxTextCtrl* modelNameText_;
 			wxStaticText* infoLabel_;
 			wxButton* uploadButton_;
+			wxToolBar* toolBar_;
+			wxToolBarToolBase* exploreTool_; 
 		
 		public:
 			

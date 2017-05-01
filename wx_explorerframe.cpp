@@ -50,8 +50,8 @@ namespace gct {
         return os.str();
     }
 
-    ExplorerFrame::ExplorerFrame( std::shared_ptr< gcu::PrinterService > printerService )
-            : ExplorerFrameBase( nullptr )
+    ExplorerFrame::ExplorerFrame( wxWindow* parent, std::shared_ptr< gcu::PrinterService > printerService )
+            : ExplorerFrameBase( parent )
             , printerService_( std::move( printerService ) )
     {
         modelsListCtrl_->AppendColumn( _( "Model" ), wxLIST_FORMAT_LEFT, 300 );
@@ -92,6 +92,11 @@ namespace gct {
             } );
         } );
         printerService_->requestPrinters();
+    }
+
+    ExplorerFrame::ExplorerFrame( std::shared_ptr< gcu::PrinterService > printerService )
+            : ExplorerFrame( nullptr, std::move( printerService ) )
+    {
     }
 
     void ExplorerFrame::RefreshControlStates()

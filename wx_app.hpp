@@ -30,6 +30,7 @@ namespace gct {
         std::uint16_t port_;
         wxString apikey_;
         wxString printer_;
+        wxString modelName_;
         bool deleteFile_;
         Command command_;
         wxString gcodePath_;

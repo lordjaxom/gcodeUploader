@@ -10,17 +10,18 @@
 
 #include "wx_clientptr.hpp"
 #include "wx_uploadframe.hpp"
+#include "wx_explorerframe.hpp"
 
 namespace gct {
 
     UploadFrame::UploadFrame(
             std::shared_ptr< gcu::PrinterService > printerService, std::filesystem::path gcodePath,
-            std::string printer, bool deleteFile )
+            wxString printer, wxString modelName, bool deleteFile )
             : UploadFrameBase( nullptr )
             , printerService_( std::move( printerService ) )
             , gcodePath_( std::move( gcodePath ) )
             , selectedPrinter_( std::move( printer ) )
-            , enteredModelName_( gcodePath_.stem().string() )
+            , enteredModelName_( !modelName.empty() ? std::move( modelName ) : gcodePath_.stem().string() )
     {
         gcodeFileText_->SetValue( gcodePath_.filename().string() );
         deleteFileCheckbox_->SetValue( deleteFile );
@@ -31,6 +32,7 @@ namespace gct {
         addModelGroupButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnAddModelGroupClicked(); } );
         modelNameText_->Bind( wxEVT_TEXT, [this]( auto& ) { this->OnModelNameChanged(); } );
         uploadButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnUploadClicked(); } );
+        toolBar_->Bind( wxEVT_TOOL, [this]( auto& ) { this->OnToolBarExplore(); }, gctID_EXPLORE );
 
         printerService_->connectionLost.connect( [this]( auto ec ) {
             this->CallAfter( [=] {
@@ -64,20 +66,22 @@ namespace gct {
     std::size_t UploadFrame::FindSelectedModelId()
     {
         auto it = std::find_if( models_.begin(), models_.end(), [this]( auto const& item ) {
-            return item.name() == enteredModelName_ && item.modelGroup() == selectedModelGroup_;
+            return item.name() == enteredModelName_.ToUTF8().data() && item.modelGroup() == selectedModelGroup_;
         } );
         return it != models_.end() ? it->id() : MODEL_NOT_FOUND;
     }
 
     void UploadFrame::PerformUpload(
-            std::string const& printer, std::string const& modelName, std::string const& modelGroup, bool deleteFile )
+            wxString const& printer, wxString const& modelName, wxString const& modelGroup, bool deleteFile )
     {
-        printerService_->upload( printer, modelName, modelGroup, gcodePath_, [this, deleteFile] {
-            if ( deleteFile ) {
-                std::remove( gcodePath_.string().c_str() );
-            }
-            Close();
-        } );
+        printerService_->upload(
+                printer.ToStdString(), modelName.ToUTF8().data(), modelGroup.ToStdString(), gcodePath_,
+                [this, deleteFile] {
+                    if ( deleteFile ) {
+                        std::remove( gcodePath_.string().c_str() );
+                    }
+                    Close();
+                } );
     }
 
     void UploadFrame::OnPrinterSelected()
@@ -86,8 +90,8 @@ namespace gct {
         if ( selection != wxNOT_FOUND ) {
             selectedPrinter_ = wxClientPtrCast< gcu::repetier::Printer >(
                     printerChoice_->GetClientObject( (unsigned) selection ) ).slug();
-            printerService_->requestModelGroups( selectedPrinter_ );
-            printerService_->requestModels( selectedPrinter_ );
+            printerService_->requestModelGroups( selectedPrinter_.ToStdString() );
+            printerService_->requestModels( selectedPrinter_.ToStdString() );
         }
     }
 
@@ -107,8 +111,8 @@ namespace gct {
         wxTextEntryDialog dialog( this, _( "Please enter the name of the new model group" ) );
         // TODO: input validation
         if ( dialog.ShowModal() == wxID_OK ) {
-            selectedModelGroup_ = dialog.GetValue().ToStdString();
-            printerService_->addModelGroup( selectedPrinter_, selectedModelGroup_ );
+            selectedModelGroup_ = dialog.GetValue();
+            printerService_->addModelGroup( selectedPrinter_.ToStdString(), selectedModelGroup_.ToStdString() );
         }
     }
 
@@ -125,7 +129,7 @@ namespace gct {
         auto modelId = FindSelectedModelId();
         if ( modelId != MODEL_NOT_FOUND ) {
             printerService_->removeModel(
-                    selectedPrinter_, modelId,
+                    selectedPrinter_.ToStdString(), modelId,
                     [this, printer = selectedPrinter_, modelName = enteredModelName_,
                             modelGroup = selectedModelGroup_, deleteFile = deleteFileCheckbox_->GetValue()] {
                         PerformUpload( printer, modelName, modelGroup, deleteFile );
@@ -134,6 +138,12 @@ namespace gct {
         else {
             PerformUpload( selectedPrinter_, enteredModelName_, selectedModelGroup_, deleteFileCheckbox_->GetValue() );
         }
+    }
+
+    void UploadFrame::OnToolBarExplore()
+    {
+        ExplorerFrame* frame = new ExplorerFrame( this, printerService_ );
+        frame->Show( true );
     }
 
     void UploadFrame::OnConnectionLost( std::error_code ec )
