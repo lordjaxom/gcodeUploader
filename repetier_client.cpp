@@ -6,8 +6,10 @@
 
 #include <json/value.h>
 
+#include "json.hpp"
 #include "repetier_action.hpp"
 #include "repetier_client.hpp"
+#include "utf8.hpp"
 #include "utility.hpp"
 
 namespace gcu {
@@ -148,9 +150,11 @@ namespace gcu {
 
         void Client::handleMessage( websocketclient::message_ptr message )
         {
-            std::cerr << "<<< " << message->get_payload().substr( 0, 80 ) << "\n";
+            auto payload = utf8::fromUtf8( message->get_payload() );
 
-            auto response = jsonContext_.toJson( message->get_payload() );
+            std::cerr << "<<< " << payload.substr( 0, 80 ) << "\n";
+
+            auto response = json::toJson( payload );
             auto callbackId = response[ "callback_id" ].asLargestInt();
             if ( callbackId != -1 ) {
                 handleActionResponse( callbackId, std::move( response ) );
@@ -210,11 +214,13 @@ namespace gcu {
             if ( !actionQueue_.empty() ) {
                 auto& action = actionQueue_.front();
                 if ( !action.pending ) {
-                    auto message = jsonContext_.toString( action.request );
-                    std::cerr << ">>> " << message.substr( 0, 80 ) << "\n";
+                    auto message = json::fromJson( action.request );
+                    auto payload = utf8::toUtf8( message );
+
+                    std::cerr << ">>> " << payload.substr( 0, 80 ) << "\n";
 
                     auto connection = wsclient_.get_con_from_hdl( wshandle_ );
-                    connection->send( message, websocketpp::frame::opcode::text );
+                    connection->send( payload, websocketpp::frame::opcode::text );
 
                     action.pending = true;
                 }

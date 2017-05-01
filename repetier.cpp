@@ -10,6 +10,7 @@
 
 #include "repetier.hpp"
 #include "repetier_action.hpp"
+#include "utf8.hpp"
 #include "utility.hpp"
 
 namespace gcu {
@@ -165,8 +166,8 @@ namespace gcu {
     {
         std::string command = util::str(
                 "curl -s -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: ", apikey_, "\" ",
-                "-F \"a=upload\" -F \"name=", modelName, "\" -F \"group=", modelGroup, "\" -F \"filename=@",
-                gcodePath.string(), "\" ", UploadUrl( hostname_, port_, printer ) );
+                "-F \"a=upload\" -F \"name=", utf8::toUtf8( modelName ), "\" -F \"group=", utf8::toUtf8( modelGroup ),
+                "\" -F \"filename=@", gcodePath.string(), "\" ", UploadUrl( hostname_, port_, printer ) );
 
         std::thread worker(
                 [command = std::move( command ), callback = std::move( callback )] {

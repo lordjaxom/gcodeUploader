@@ -13,12 +13,13 @@
 
 #include <boost/signals2/signal.hpp>
 
+#include <json/value.h>
+
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 
 #include "std_optional.hpp"
 
-#include "json.hpp"
 #include "repetier_definitions.hpp"
 
 namespace gcu {
@@ -110,7 +111,6 @@ namespace gcu {
             std::list< Action > actionQueue_;
             std::recursive_mutex actionMutex_;
             ClientEvents events_;
-            JsonContext jsonContext_;
         };
 
     } // namespace repetier

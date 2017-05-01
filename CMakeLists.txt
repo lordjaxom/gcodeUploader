@@ -19,15 +19,9 @@ set(LIB_SOURCE_FILES
         std_optional.hpp
         std_filesystem.hpp)
 
-set(GCU_SOURCE_FILES
-        main.cpp
-        commandline.cpp
-        commandline.hpp
-        uploader_form.cpp
-        uploader_form.hpp
-        resource.rc)
-
 set(GCT_SOURCE_FILES
+        utf8.cpp
+        utf8.hpp
         wx_generated.cpp
         wx_generated.h
         wx_resource.rc
@@ -43,9 +37,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 find_package(Boost 1.60.0 COMPONENTS ""  REQUIRED)
 find_package(wxWidgets COMPONENTS core base REQUIRED)
-
-find_path(nana_INCLUDE_DIRS nana/config.hpp HINTS ${NANA_ROOT}/include)
-find_library(nana_LIBRARIES NAMES nana libnana HINTS ${NANA_ROOT})
+set(wxWidgets_DEFINITIONS ${wxWidgets_DEFINITIONS} -DwxUSE_UNICODE=0)
 
 find_path(asio_INCLUDE_DIRS asio.hpp HINTS ${ASIO_ROOT}/include)
 set(asio_DEFINITIONS ASIO_STANDALONE)
@@ -64,21 +56,20 @@ add_library(gcodeLib OBJECT ${LIB_SOURCE_FILES})
 target_compile_definitions(gcodeLib PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
 target_include_directories(gcodeLib PRIVATE ${Boost_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
 
-add_executable(gcodeUploader $<TARGET_OBJECTS:gcodeLib> ${GCU_SOURCE_FILES})
-target_compile_definitions(gcodeUploader PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
-target_include_directories(gcodeUploader PRIVATE ${Boost_INCLUDE_DIRS} ${nana_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
-target_link_libraries(gcodeUploader ${Boost_LIBRARIES} ${nana_LIBRARIES} ${jsoncpp_LIBRARIES})
-if(WIN32)
-    target_link_libraries(gcodeUploader ws2_32 stdc++fs)
-endif()
-
-add_custom_command(TARGET gcodeUploader POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CURL_ROOT} $<TARGET_FILE_DIR:gcodeUploader>)
+message("${wxWidgets_DEFINITIONS}")
+message("${wxWidgets_INCLUDE_DIRS}")
+message("${wxWidgets_LIBRARIES}")
 
 add_executable(gcodeTool $<TARGET_OBJECTS:gcodeLib> ${SOURCE_FILES} ${GCT_SOURCE_FILES})
-target_compile_definitions(gcodeTool PRIVATE WIN32_LEAN_AND_MEAN ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
+target_compile_definitions(gcodeTool PRIVATE WIN32_LEAN_AND_MEAN ${wxWidgets_DEFINITIONS} ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
 target_include_directories(gcodeTool PRIVATE ${Boost_INCLUDE_DIRS} ${wxWidgets_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
 target_link_libraries(gcodeTool ${Boost_LIBRARIES} ${wxWidgets_LIBRARIES} ${jsoncpp_LIBRARIES})
 if (WIN32)
     target_link_libraries(gcodeTool ws2_32 stdc++fs version shlwapi setupapi)
+
+    add_custom_command(TARGET gcodeTool POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy ${wxWidgets_ROOT_DIR}/lib/gcc_dll/wxbase310_gcc_custom.dll $<TARGET_FILE_DIR:gcodeTool>)
+    add_custom_command(TARGET gcodeTool POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy ${wxWidgets_ROOT_DIR}/lib/gcc_dll/wxmsw310_core_gcc_custom.dll $<TARGET_FILE_DIR:gcodeTool>)
+
 endif()

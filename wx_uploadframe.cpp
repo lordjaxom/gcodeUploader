@@ -66,7 +66,7 @@ namespace gct {
     std::size_t UploadFrame::FindSelectedModelId()
     {
         auto it = std::find_if( models_.begin(), models_.end(), [this]( auto const& item ) {
-            return item.name() == enteredModelName_.ToUTF8().data() && item.modelGroup() == selectedModelGroup_;
+            return item.name() == enteredModelName_ && item.modelGroup() == selectedModelGroup_;
         } );
         return it != models_.end() ? it->id() : MODEL_NOT_FOUND;
     }
@@ -75,7 +75,7 @@ namespace gct {
             wxString const& printer, wxString const& modelName, wxString const& modelGroup, bool deleteFile )
     {
         printerService_->upload(
-                printer.ToStdString(), modelName.ToUTF8().data(), modelGroup.ToStdString(), gcodePath_,
+                printer.ToStdString(), modelName.ToStdString(), modelGroup.ToStdString(), gcodePath_,
                 [this, deleteFile] {
                     if ( deleteFile ) {
                         std::remove( gcodePath_.string().c_str() );
