@@ -13,7 +13,7 @@
 
 #include <boost/signals2/signal.hpp>
 
-#include <json/value.h>
+#include <json.hpp>
 
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
@@ -37,7 +37,7 @@ namespace gcu {
             using websocketclient = websocketpp::client< websocketpp::config::asio_client >;
 
             using ConnectHandler = std::function< void ( std::error_code ec ) >;
-            using ActionHandler = std::function< void ( Json::Value&& response, std::error_code ec ) >;
+            using ActionHandler = std::function< void ( nlohmann::json&& response, std::error_code ec ) >;
 
             enum Status
             {
@@ -49,7 +49,7 @@ namespace gcu {
 
             struct Action
             {
-                Action( std::intmax_t callbackId, Json::Value&& request, ActionHandler&& handler )
+                Action( std::intmax_t callbackId, nlohmann::json&& request, ActionHandler&& handler )
                         : callbackId( callbackId )
                         , request( std::move( request ) )
                         , handler( std::move( handler ) )
@@ -58,7 +58,7 @@ namespace gcu {
                 }
 
                 std::intmax_t callbackId;
-                Json::Value request;
+                nlohmann::json request;
                 ActionHandler handler;
                 bool pending {};
             };
@@ -77,7 +77,7 @@ namespace gcu {
                     std::string const& hostname, std::uint16_t port, std::string const& apikey,
                     ConnectHandler&& handler );
             void close();
-            void send( Json::Value&& request, ActionHandler&& handler );
+            void send( nlohmann::json&& request, ActionHandler&& handler );
 
             ClientEvents& events() { return events_; }
 
@@ -86,8 +86,8 @@ namespace gcu {
             void handleFail();
             void handleClose();
             void handleMessage( websocketclient::message_ptr message );
-            void handleActionResponse( std::intmax_t callbackId, Json::Value&& response );
-            void handleEvent( Json::Value&& event );
+            void handleActionResponse( std::intmax_t callbackId, nlohmann::json&& response );
+            void handleEvent( nlohmann::json&& event );
 
             bool reconnect();
             void connect();

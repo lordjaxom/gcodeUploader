@@ -63,7 +63,7 @@ namespace gct
 		
 		public:
 			
-			UploadFrameBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxT("Upload G-Code"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,266 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+			UploadFrameBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxT("Upload G-Code"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,286 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 			
 			~UploadFrameBase();
 		

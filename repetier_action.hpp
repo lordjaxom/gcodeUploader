@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <utility>
 
-#include <json/value.h>
+#include <json.hpp>
 
 namespace gcu {
     namespace repetier {
@@ -41,14 +41,14 @@ namespace gcu {
 
             template< typename Data, typename Callback >
             void invokeCallback( Data&& data, std::error_code ec, Callback&& callback,
-                                 std::enable_if_t< !std::is_same< std::remove_reference_t< Data >, Json::Value >::value >* = nullptr )
+                                 std::enable_if_t< !std::is_same< std::remove_reference_t< Data >, nlohmann::json >::value >* = nullptr )
             {
                 std::forward< Callback >( callback )( std::forward< Data >( data ), ec );
             }
 
             template< typename Data, typename Callback >
             void invokeCallback( Data&& data, std::error_code ec, Callback&& callback,
-                                 std::enable_if_t< std::is_same< std::remove_reference_t< Data >, Json::Value >::value >* = nullptr )
+                                 std::enable_if_t< std::is_same< std::remove_reference_t< Data >, nlohmann::json >::value >* = nullptr )
             {
                 std::forward< Callback >( callback )( ec );
             }
@@ -57,7 +57,7 @@ namespace gcu {
             class Handled
             {
             public:
-                Handled( Client* client, Json::Value&& request, std::tuple< Handlers... >&& handlers )
+                Handled( Client* client, nlohmann::json&& request, std::tuple< Handlers... >&& handlers )
                         : client_( client )
                         , request_( std::move( request ) )
                         , handlers_( std::move( handlers ) )
@@ -86,7 +86,7 @@ namespace gcu {
 
             private:
                 Client* client_;
-                Json::Value request_;
+                nlohmann::json request_;
                 std::tuple< Handlers... > handlers_;
             };
 
@@ -139,8 +139,8 @@ namespace gcu {
 
             private:
                 Client* client_;
-                Json::Value request_;
-                Json::Value& data_ { request_[ "data" ] = Json::objectValue };
+                nlohmann::json request_;
+                nlohmann::json& data_ { request_[ "data" ] = nlohmann::json::object() };
             };
 
         } // namespace detail
@@ -155,8 +155,8 @@ namespace gcu {
 
             inline auto checkOkFlag()
             {
-                return []( Json::Value&& data, std::error_code& ec ) {
-                    if ( !data[ "ok" ].asBool() ) {
+                return []( nlohmann::json&& data, std::error_code& ec ) {
+                    if ( !data[ "ok" ] ) {
                         ec = std::make_error_code( std::errc::invalid_argument ); // TODO
                     }
                     return std::move( data );
@@ -165,7 +165,7 @@ namespace gcu {
 
             inline auto resolveKey( char const* key )
             {
-                return [key]( Json::Value&& data, std::error_code& ec ) {
+                return [key]( nlohmann::json&& data, std::error_code& ec ) {
                     return std::move( data[ key ] );
                 };
             }

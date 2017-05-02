@@ -44,7 +44,7 @@
             <property name="minimum_size"></property>
             <property name="name">UploadFrameBase</property>
             <property name="pos"></property>
-            <property name="size">500,266</property>
+            <property name="size">500,286</property>
             <property name="style">wxDEFAULT_FRAME_STYLE</property>
             <property name="subclass"></property>
             <property name="title">Upload G-Code</property>

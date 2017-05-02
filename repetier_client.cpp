@@ -4,9 +4,6 @@
 
 #include <asio/io_service.hpp>
 
-#include <json/value.h>
-
-#include "json.hpp"
 #include "repetier_action.hpp"
 #include "repetier_client.hpp"
 #include "utf8.hpp"
@@ -150,16 +147,14 @@ namespace gcu {
 
         void Client::handleMessage( websocketclient::message_ptr message )
         {
-            auto payload = utf8::fromUtf8( message->get_payload() );
+            std::cerr << "<<< " << message->get_payload().substr( 0, 80 ) << "\n";
 
-            std::cerr << "<<< " << payload.substr( 0, 80 ) << "\n";
-
-            auto response = json::toJson( payload );
-            auto callbackId = response[ "callback_id" ].asLargestInt();
+            auto response = nlohmann::json::parse( message->get_payload() );
+            auto callbackId = response[ "callback_id" ];
             if ( callbackId != -1 ) {
                 handleActionResponse( callbackId, std::move( response ) );
             }
-            else if ( response[ "eventList" ].asBool() ) {
+            else if ( response[ "eventList" ] ) {
                 auto& eventList = response[ "data" ];
                 std::for_each( eventList.begin(), eventList.end(), [this]( auto&& event ) {
                     this->handleEvent( std::move( event ) );
@@ -170,7 +165,7 @@ namespace gcu {
             }
         }
 
-        void Client::handleActionResponse( std::intmax_t callbackId, Json::Value&& response )
+        void Client::handleActionResponse( std::intmax_t callbackId, nlohmann::json&& response )
         {
             std::lock_guard< std::recursive_mutex > lock( actionMutex_ );
 
@@ -186,25 +181,25 @@ namespace gcu {
             std::cerr << "WARN: Received response to unrequested callback " << callbackId << ", ignoring message\n";
         }
 
-        void Client::handleEvent( Json::Value&& event )
+        void Client::handleEvent( nlohmann::json&& event )
         {
             auto type = event[ "event" ];
             if ( type == "printerListChanged" ) {
                 events_.printersChanged();
             }
             else if ( type == "modelGroupListChanged" ) {
-                events_.modelGroupsChanged( event[ "printer" ].asString() );
+                events_.modelGroupsChanged( event[ "printer" ] );
             }
             else if ( type == "jobsChanged" ) {
-                events_.modelsChanged( event[ "printer" ].asString() );
+                events_.modelsChanged( event[ "printer" ] );
             }
         }
 
-        void Client::send( Json::Value&& request, ActionHandler&& handler )
+        void Client::send( nlohmann::json&& request, ActionHandler&& handler )
         {
             std::lock_guard< std::recursive_mutex > lock( actionMutex_ );
 
-            auto it = request[ "action" ].asString() == "login" ? actionQueue_.begin() : actionQueue_.end();
+            auto it = request[ "action" ] == "login" ? actionQueue_.begin() : actionQueue_.end();
             actionQueue_.emplace( it, ++nextCallbackId_, std::move( request ), std::move( handler ) );
             sendIfReady();
         }
@@ -214,8 +209,7 @@ namespace gcu {
             if ( !actionQueue_.empty() ) {
                 auto& action = actionQueue_.front();
                 if ( !action.pending ) {
-                    auto message = json::fromJson( action.request );
-                    auto payload = utf8::toUtf8( message );
+                    auto payload = action.request.dump();
 
                     std::cerr << ">>> " << payload.substr( 0, 80 ) << "\n";
 

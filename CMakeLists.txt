@@ -4,8 +4,6 @@ project(gcodeUploader)
 include(CMakeLocal.cmake)
 
 set(LIB_SOURCE_FILES
-        json.cpp
-        json.hpp
         repetier.cpp
         repetier.hpp
         repetier_action.hpp
@@ -45,8 +43,7 @@ set(asio_DEFINITIONS ASIO_STANDALONE)
 find_path(websocketpp_INCLUDE_DIRS websocketpp/client.hpp HINTS ${WEBSOCKETPP_ROOT})
 set(websocketpp_DEFINITIONS _WEBSOCKETPP_CPP11_THREAD_)
 
-find_path(jsoncpp_INCLUDE_DIRS json/json.h HINTS ${JSONCPP_ROOT}/include)
-find_library(jsoncpp_LIBRARIES NAMES jsoncpp libjsoncpp HINTS ${JSONCPP_ROOT}/src/lib_json)
+find_path(json_INCLUDE_DIRS json.hpp HINTS ${JSON_ROOT}/src)
 
 if(MINGW)
     add_compile_options(-Wa,-mbig-obj)
@@ -54,16 +51,12 @@ endif()
 
 add_library(gcodeLib OBJECT ${LIB_SOURCE_FILES})
 target_compile_definitions(gcodeLib PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
-target_include_directories(gcodeLib PRIVATE ${Boost_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
-
-message("${wxWidgets_DEFINITIONS}")
-message("${wxWidgets_INCLUDE_DIRS}")
-message("${wxWidgets_LIBRARIES}")
+target_include_directories(gcodeLib PRIVATE ${Boost_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${json_INCLUDE_DIRS})
 
 add_executable(gcodeTool $<TARGET_OBJECTS:gcodeLib> ${SOURCE_FILES} ${GCT_SOURCE_FILES})
 target_compile_definitions(gcodeTool PRIVATE WIN32_LEAN_AND_MEAN ${wxWidgets_DEFINITIONS} ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
-target_include_directories(gcodeTool PRIVATE ${Boost_INCLUDE_DIRS} ${wxWidgets_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${jsoncpp_INCLUDE_DIRS})
-target_link_libraries(gcodeTool ${Boost_LIBRARIES} ${wxWidgets_LIBRARIES} ${jsoncpp_LIBRARIES})
+target_include_directories(gcodeTool PRIVATE ${Boost_INCLUDE_DIRS} ${wxWidgets_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${json_INCLUDE_DIRS})
+target_link_libraries(gcodeTool ${Boost_LIBRARIES} ${wxWidgets_LIBRARIES})
 if (WIN32)
     target_link_libraries(gcodeTool ws2_32 stdc++fs version shlwapi setupapi)
 

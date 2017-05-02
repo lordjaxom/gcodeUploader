@@ -6,7 +6,7 @@
 #include <thread>
 #include <utility>
 
-#include <json/value.h>
+#include <json.hpp>
 
 #include "repetier.hpp"
 #include "repetier_action.hpp"
@@ -73,9 +73,7 @@ namespace gcu {
         using namespace repetier::action;
         repetier::makeAction( &*client_, "listPrinter" )
                 .handle( transform< repetier::Printer >( []( auto&& printer ) {
-                    return repetier::Printer( printer[ "active" ].asBool(),
-                                              printer[ "name" ].asString(),
-                                              printer[ "slug" ].asString());
+                    return repetier::Printer( printer[ "active" ], printer[ "name" ], printer[ "slug" ] );
                 } ) )
                 .send( std::move( callback ) );
     }
@@ -89,14 +87,15 @@ namespace gcu {
                 .handle( resolveKey( "data" ) )
                 .handle( transform< repetier::Model >( []( auto&& model ) {
                     return repetier::Model(
-                            model[ "id" ].asLargestUInt(),
-                            model[ "name" ].asString(),
-                            model[ "group" ].asString(),
-                            model[ "created" ].asLargestUInt() / 1000,
-                            model[ "length" ].asLargestUInt(),
-                            model[ "layer" ].asLargestUInt(),
-                            model[ "lines" ].asLargestUInt(),
-                            std::chrono::milliseconds( (std::uint64_t) ( model[ "printTime" ].asDouble() * 1000.0 ) ) );
+                            model[ "id" ],
+                            model[ "name" ],
+                            model[ "group" ],
+                            model[ "created" ].template get< std::size_t >() / 1000,
+                            model[ "length" ],
+                            model[ "layer" ],
+                            model[ "lines" ],
+                            std::chrono::milliseconds(
+                                    (std::uint64_t) ( model[ "printTime" ].template get< double >() * 1000.0 ) ) );
                 } ) )
                 .send( std::move( callback ) );
     }
@@ -110,7 +109,7 @@ namespace gcu {
                 .handle( checkOkFlag() )
                 .handle( resolveKey( "groupNames" ) )
                 .handle( transform< repetier::ModelGroup >( []( auto&& groupName ) {
-                    return repetier::ModelGroup( groupName.asString() );
+                    return repetier::ModelGroup( groupName.template get< std::string >() );
                 } ) )
                 .send( std::move( callback ) );
     }
