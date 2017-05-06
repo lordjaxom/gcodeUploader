@@ -159,8 +159,8 @@ namespace gct {
         int selected = 0;
         for ( auto&& printer : printers ) {
             auto ptr = new wxClientPtr< gcu::repetier::Printer >( std::move( printer ) );
-            int index = printerChoice_->Append( ptr->GetValue().name(), ptr );
-            if ( ptr->GetValue().slug() == selectedPrinter_ ) {
+            int index = printerChoice_->Append( ( *ptr )->name(), ptr );
+            if ( ( *ptr )->slug() == selectedPrinter_ ) {
                 selected = index;
             }
         }
@@ -184,8 +184,8 @@ namespace gct {
             for ( auto&& modelGroup : modelGroups ) {
                 auto ptr = new wxClientPtr< gcu::repetier::ModelGroup >( std::move( modelGroup ) );
                 int index = modelGroupChoice_->Append(
-                        ptr->GetValue().defaultGroup() ? _( "Default" ) : ptr->GetValue().name(), ptr );
-                if ( ptr->GetValue().name() == selectedModelGroup_ ) {
+                        ( *ptr )->defaultGroup() ? _( "Default" ) : ( *ptr )->name(), ptr );
+                if ( ( *ptr )->name() == selectedModelGroup_ ) {
                     selected = index;
                 }
             }

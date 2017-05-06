@@ -4,18 +4,14 @@
 
 #include <asio/io_service.hpp>
 
+#include "conversion.hpp"
 #include "repetier_action.hpp"
 #include "repetier_client.hpp"
+#include "http.hpp"
 #include "utf8.hpp"
-#include "utility.hpp"
 
 namespace gcu {
     namespace repetier {
-
-        static std::string buildSocketUrl( std::string const& hostname, std::uint16_t port )
-        {
-            return util::str( "ws://", hostname, ':', port, "/socket" );
-        }
 
         Client::Client( asio::io_service& service )
         {
@@ -51,7 +47,8 @@ namespace gcu {
         void Client::connect()
         {
             std::error_code ec;
-            auto connection = wsclient_.get_connection( buildSocketUrl( *hostname_, port_ ), ec );
+            auto connection =
+                    wsclient_.get_connection( cnv::toString( Url( "ws", *hostname_, port_, "socket" ) ), ec );
             if ( ec ) {
                 propagateError( ec );
                 return;

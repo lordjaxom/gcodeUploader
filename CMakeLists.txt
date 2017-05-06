@@ -13,9 +13,11 @@ set(LIB_SOURCE_FILES
         repetier_definitions.hpp
         printer_service.cpp
         printer_service.hpp
-        utility.hpp
         std_optional.hpp
-        std_filesystem.hpp)
+        std_filesystem.hpp
+        conversion.hpp
+        http.cpp
+        http.hpp)
 
 set(GCT_SOURCE_FILES
         utf8.cpp
@@ -46,7 +48,9 @@ set(websocketpp_DEFINITIONS _WEBSOCKETPP_CPP11_THREAD_)
 find_path(json_INCLUDE_DIRS json.hpp HINTS ${JSON_ROOT}/src)
 
 if(MINGW)
-    add_compile_options(-Wa,-mbig-obj)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wa,-mbig-obj")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mwindows")
+
 endif()
 
 add_library(gcodeLib OBJECT ${LIB_SOURCE_FILES})

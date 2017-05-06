@@ -1,6 +1,8 @@
 #ifndef GCODEUPLOADER_WX_CLIENTPTR_HPP
 #define GCODEUPLOADER_WX_CLIENTPTR_HPP
 
+#include <utility>
+
 #include <wx/clntdata.h>
 
 namespace gct {
@@ -18,8 +20,14 @@ namespace gct {
 
         wxClientPtr( wxClientPtr const& ) = delete;
 
-        Type& GetValue() { return value_; }
-        Type const& GetValue() const { return value_; }
+        operator Type&() { return value_; }
+        operator Type const&() const { return value_; }
+
+        Type& operator*() { return value_; }
+        Type const& operator*() const { return value_; }
+
+        Type* operator->() { return &value_; }
+        Type const* operator->() const { return &value_; }
 
     private:
         Type value_;
@@ -28,13 +36,13 @@ namespace gct {
     template< typename Type >
     Type& wxClientPtrCast( wxClientData* clientData )
     {
-        return dynamic_cast< wxClientPtr< Type >& >( *clientData ).GetValue();
+        return *static_cast< wxClientPtr< Type >& >( *clientData );
     }
 
     template< typename Type >
     Type const& wxClientPtrCast( wxClientData const* clientData )
     {
-        return dynamic_cast< wxClientPtr< Type >& >( *clientData ).GetValue();
+        return *static_cast< wxClientPtr< Type > const& >( *clientData );
     }
 
 } // namespace gct

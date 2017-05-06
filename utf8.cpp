@@ -1,20 +1,23 @@
+#include <ostream>
+
 #include <wx/string.h>
 
 #include "utf8.hpp"
 
 namespace gcu {
     namespace utf8 {
+        namespace detail {
 
-        std::string fromUtf8( std::string const& utf8 )
-        {
-            return wxString::FromUTF8( utf8.data(), utf8.size() ).ToStdString();
-        }
+            void fromUtf8( std::ostream& os, char const* data, std::size_t size )
+            {
+                os << wxString::FromUTF8( data, size );
+            }
 
-        std::string toUtf8( std::string const& local )
-        {
-            auto utf8 = wxString( local ).ToUTF8();
-            return { utf8.data(), utf8.length() };
-        }
+            void toUtf8( std::ostream& os, char const* data, std::size_t size )
+            {
+                os << wxString( data, size ).ToUTF8();
+            }
 
+        } // namespace detail
     } // namespace utf8
 } // namespace gcu

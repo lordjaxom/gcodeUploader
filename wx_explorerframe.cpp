@@ -4,8 +4,8 @@
 #include <wx/msgdlg.h>
 #include <wx/textdlg.h>
 
+#include "conversion.hpp"
 #include "printer_service.hpp"
-#include "utility.hpp"
 #include <wx/msw/winundef.h>
 
 #include "wx_clientptr.hpp"
@@ -16,38 +16,39 @@ namespace gct {
     static constexpr std::size_t kilobyte = 1024;
     static constexpr std::size_t megabyte = kilobyte * 1024;
 
-    static std::string formatFileSize( std::size_t size )
+    static auto formatFileSize( std::size_t size )
     {
-        if ( size >= megabyte ) {
-            return gcu::util::str( std::fixed, std::setprecision( 2 ), (double) size / megabyte, " MiB" );
-        }
-        if ( size >= kilobyte ) {
-            return gcu::util::str( std::fixed, std::setprecision( 2 ), (double) size / kilobyte, " kiB" );
-        }
-        return gcu::util::str( size, " B" );
+        return [&]( std::ostream& os ) {
+            size >= megabyte ? ( os << std::fixed << std::setprecision( 2 ) << (double) size / megabyte << " MiB" ) :
+            size >= kilobyte ? ( os << std::fixed << std::setprecision( 2 ) << (double) size / kilobyte << " kiB" ) :
+            ( os << size << " B" );
+        };
     }
 
-    static std::string formatDuration( std::chrono::microseconds duration )
+    static auto formatDuration( std::chrono::microseconds duration )
     {
-        std::ostringstream os;
-        bool output = false;
-        auto hours = std::chrono::duration_cast< std::chrono::hours >( duration );
-        if ( hours.count() > 0 ) {
-            os << hours.count() << 'h';
-            output = true;
-        }
-        duration -= hours;
-        auto minutes = std::chrono::duration_cast< std::chrono::minutes >( duration );
-        if ( minutes.count() > 0 || output ) {
-            if ( output ) os << ' ';
-            os << minutes.count() << 'm';
-            output = true;
-        }
-        duration -= minutes;
-        auto seconds = std::chrono::duration_cast< std::chrono::seconds >( duration );
-        if ( output ) os << ' ';
-        os << seconds.count() << 's';
-        return os.str();
+        return [&]( std::ostream& os ) {
+            auto hours = std::chrono::duration_cast< std::chrono::hours >( duration );
+            if ( hours.count() > 0 ) {
+                os << hours.count() << 'h';
+            }
+            duration -= hours;
+
+            auto minutes = std::chrono::duration_cast< std::chrono::minutes >( duration );
+            if ( minutes.count() > 0 || hours.count() > 0 ) {
+                if ( hours.count() > 0 ) {
+                    os << ' ';
+                }
+                os << minutes.count() << 'm';
+            }
+            duration -= minutes;
+
+            auto seconds = std::chrono::duration_cast< std::chrono::seconds >( duration );
+            if ( hours.count() > 0 ) {
+                os << ' ';
+            }
+            os << seconds.count() << 's';
+        };
     }
 
     ExplorerFrame::ExplorerFrame( wxWindow* parent, std::shared_ptr< gcu::PrinterService > printerService )
@@ -168,7 +169,7 @@ namespace gct {
     void ExplorerFrame::OnToolBarRemoveModels()
     {
         if ( wxMessageBox(
-                gcu::util::str( "Really remove ", selectedModels_.size(), " models?" ), _( "Question" ),
+                gcu::cnv::toString( "Really remove ", selectedModels_.size(), " models?" ), _( "Question" ),
                 wxYES_NO | wxICON_QUESTION, this ) == wxYES ) {
             std::for_each( selectedModels_.begin(), selectedModels_.end(), [this]( auto id ) {
                 printerService_->removeModel( selectedPrinter_, id );
@@ -194,7 +195,7 @@ namespace gct {
     {
         if ( !models_.empty() ) {
             if ( wxMessageBox(
-                    gcu::util::str( "Really remove group containing ", models_.size(), " models?" ), _( "Question" ),
+                    gcu::cnv::toString( "Really remove group containing ", models_.size(), " models?" ), _( "Question" ),
                     wxYES_NO | wxICON_QUESTION, this ) == wxNO ) {
                 return;
             }
@@ -216,8 +217,8 @@ namespace gct {
         int selected = 0;
         for ( auto&& printer : printers ) {
             auto ptr = new wxClientPtr< gcu::repetier::Printer >( std::move( printer ) );
-            int index = printerChoice_->Append( ptr->GetValue().name(), ptr );
-            if ( ptr->GetValue().slug() == selectedPrinter_ ) {
+            int index = printerChoice_->Append( ( *ptr )->name(), ptr );
+            if ( ( *ptr )->slug() == selectedPrinter_ ) {
                 selected = index;
             }
         }
@@ -241,8 +242,8 @@ namespace gct {
             for ( auto&& modelGroup : modelGroups ) {
                 auto ptr = new wxClientPtr< gcu::repetier::ModelGroup >( std::move( modelGroup ) );
                 int index = modelGroupChoice_->Append(
-                        ptr->GetValue().defaultGroup() ? _( "Default" ) : ptr->GetValue().name(), ptr );
-                if ( ptr->GetValue().name() == selectedModelGroup_ ) {
+                        ( *ptr )->defaultGroup() ? _( "Default" ) : ( *ptr )->name(), ptr );
+                if ( ( *ptr )->name() == selectedModelGroup_ ) {
                     selected = index;
                 }
             }
@@ -262,10 +263,10 @@ namespace gct {
                 if ( model.modelGroup() == selectedModelGroup_ ) {
                     long index = modelsListCtrl_->InsertItem( modelsListCtrl_->GetItemCount(), model.name() );
                     modelsListCtrl_->SetItem(
-                            index, 1, gcu::util::str( std::put_time( std::localtime( &model.created() ), "%c" ) ) );
-                    modelsListCtrl_->SetItem( index, 2, formatFileSize( model.length() ) );
+                            index, 1, gcu::cnv::toString( std::put_time( std::localtime( &model.created() ), "%c" ) ) );
+                    modelsListCtrl_->SetItem( index, 2, gcu::cnv::toString( formatFileSize( model.length() ) ) );
                     modelsListCtrl_->SetItem( index, 3, std::to_string( model.lines() ) );
-                    modelsListCtrl_->SetItem( index, 4, formatDuration( model.printTime() ) );
+                    modelsListCtrl_->SetItem( index, 4, gcu::cnv::toString( formatDuration( model.printTime() ) ) );
                     modelsListCtrl_->SetItem( index, 5, std::to_string( model.layers() ) );
                     if ( selectedModels_.find( model.id() ) != selectedModels_.end() ) {
                         modelsListCtrl_->SetItemState( index, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED );
