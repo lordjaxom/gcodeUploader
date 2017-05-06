@@ -1,5 +1,5 @@
-#ifndef GCODEUPLOADER_STD_OPTIONAL_HPP
-#define GCODEUPLOADER_STD_OPTIONAL_HPP
+#ifndef GCODEUPLOADER_OPTIONAL_HPP
+#define GCODEUPLOADER_OPTIONAL_HPP
 
 #if __cplusplus < 201700L
 #   include <experimental/optional>
@@ -16,4 +16,4 @@ namespace std {
 #   include <optional>
 #endif
 
-#endif //GCODEUPLOADER_STD_OPTIONAL_HPP
+#endif //GCODEUPLOADER_OPTIONAL_HPP

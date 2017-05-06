@@ -10,6 +10,7 @@
 #include <json.hpp>
 
 #include "conversion.hpp"
+#include "http.hpp"
 #include "repetier.hpp"
 #include "repetier_action.hpp"
 #include "utf8.hpp"
@@ -167,7 +168,8 @@ namespace gcu {
         std::string command = cnv::toString(
                 "curl -s -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: ", apikey_, "\" ",
                 "-F \"a=upload\" -F \"name=", utf8::toUtf8( modelName ), "\" -F \"group=", utf8::toUtf8( modelGroup ),
-                "\" -F \"filename=@", gcodePath.string(), "\" ", UploadUrl( hostname_, port_, printer ) );
+                "\" -F \"filename=@", gcodePath.string(), "\" ",
+                Url( url::http( port_ ), hostname_, "/printer/model/"_c, printer ) );
 
         std::thread worker(
                 [command = std::move( command ), callback = std::move( callback )] {

@@ -48,7 +48,7 @@ namespace gcu {
         {
             std::error_code ec;
             auto connection =
-                    wsclient_.get_connection( cnv::toString( Url( "ws", *hostname_, port_, "socket" ) ), ec );
+                    wsclient_.get_connection( cnv::toString( Url( url::ws( port_ ), *hostname_, "socket"_c ) ), ec );
             if ( ec ) {
                 propagateError( ec );
                 return;

@@ -7,11 +7,12 @@
 #include <memory>
 #include <system_error>
 
-#include "std_optional.hpp"
+#include "std/optional.hpp"
 
 #include <boost/signals2/signal.hpp>
 
 #include "repetier.hpp"
+#include "string.hpp"
 
 namespace gcu {
 

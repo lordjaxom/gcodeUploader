@@ -13,11 +13,14 @@ set(LIB_SOURCE_FILES
         repetier_definitions.hpp
         printer_service.cpp
         printer_service.hpp
-        std_optional.hpp
-        std_filesystem.hpp
+        std/optional.hpp
+        std/filesystem.hpp
         conversion.hpp
         http.cpp
-        http.hpp)
+        http.hpp
+        string.cpp
+        string.hpp
+        std/variant.hpp)
 
 set(GCT_SOURCE_FILES
         utf8.cpp
@@ -46,20 +49,20 @@ find_path(websocketpp_INCLUDE_DIRS websocketpp/client.hpp HINTS ${WEBSOCKETPP_RO
 set(websocketpp_DEFINITIONS _WEBSOCKETPP_CPP11_THREAD_)
 
 find_path(json_INCLUDE_DIRS json.hpp HINTS ${JSON_ROOT}/src)
+find_path(variant_INCLUDE_DIRS mpark/variant.hpp HINTS ${VARIANT_ROOT}/include)
 
 if(MINGW)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wa,-mbig-obj")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mwindows")
-
 endif()
 
 add_library(gcodeLib OBJECT ${LIB_SOURCE_FILES})
 target_compile_definitions(gcodeLib PRIVATE ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
-target_include_directories(gcodeLib PRIVATE ${Boost_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${json_INCLUDE_DIRS})
+target_include_directories(gcodeLib PRIVATE ${Boost_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${json_INCLUDE_DIRS} ${variant_INCLUDE_DIRS})
 
 add_executable(gcodeTool $<TARGET_OBJECTS:gcodeLib> ${SOURCE_FILES} ${GCT_SOURCE_FILES})
 target_compile_definitions(gcodeTool PRIVATE WIN32_LEAN_AND_MEAN ${wxWidgets_DEFINITIONS} ${asio_DEFINITIONS} ${websocketpp_DEFINITIONS})
-target_include_directories(gcodeTool PRIVATE ${Boost_INCLUDE_DIRS} ${wxWidgets_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${json_INCLUDE_DIRS})
+target_include_directories(gcodeTool PRIVATE ${Boost_INCLUDE_DIRS} ${wxWidgets_INCLUDE_DIRS} ${asio_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS} ${json_INCLUDE_DIRS} ${variant_INCLUDE_DIRS})
 target_link_libraries(gcodeTool ${Boost_LIBRARIES} ${wxWidgets_LIBRARIES})
 if (WIN32)
     target_link_libraries(gcodeTool ws2_32 stdc++fs version shlwapi setupapi)

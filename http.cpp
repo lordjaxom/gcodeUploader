@@ -5,17 +5,49 @@
 
 namespace gcu {
 
-    Url::Url( std::string protocol, std::string host, std::uint16_t port, std::string path )
-        : protocol_( std::move( protocol ) ),
-          host_( std::move( host ) ),
-          port_( port ),
-          path_( path )
+    namespace url {
+
+        std::tuple< char const*, std::uint16_t > http( std::uint16_t port )
+        {
+            return { "http", port };
+        }
+
+        std::tuple< char const*, std::uint16_t > ws( std::uint16_t port )
+        {
+            return { "ws", port };
+        }
+
+    } // namespace url
+
+    Url::Url( url::Protocol protocol, String host )
+            : Url( std::move( protocol ), std::move( host ), std::vector< String > {} )
+    {
+
+    }
+
+    Url::Url( url::Protocol&& protocol, String&& host, std::vector< String >&& path )
+            : protocol_( std::move( protocol ) ),
+              host_( std::move( host ) ),
+              path_( std::move( path ) )
     {
     }
 
-    void Url::operator()( std::ostream& os )
+    std::ostream& operator<<( std::ostream& os, Url const& value )
     {
-        os << protocol_ << "://" << host_ << ':' << port_ << '/' << path_;
+        os << std::get< 0 >( value.protocol_ ) << "://" << value.host_ << ':' << std::get< 1 >( value.protocol_ );
+
+        bool slash = false;
+        for ( auto const& component : value.path_ ) {
+            if ( component.empty() ) {
+                continue;
+            }
+
+            if ( !slash && component.front() != '/' ) {
+                os << '/';
+            }
+            os << component;
+            slash = component.back() == '/';
+        }
     }
 
 } // namespace gcu
