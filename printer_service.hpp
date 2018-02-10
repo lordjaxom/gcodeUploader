@@ -43,7 +43,8 @@ namespace gcu {
                 std::function< void () > callback = {} );
         void upload(
                 std::string const& printer, std::string const& modelName, std::string const& modelGroup,
-                std::filesystem::path const& gcodePath, std::function< void () > callback = {} );
+                std::filesystem::path const& gcodePath, std::filesystem::path const& executablePath,
+                std::function< void () > callback = {} );
 
         boost::signals2::signal< void ( std::error_code ) > connectionLost;
         boost::signals2::signal< void ( std::vector< repetier::Printer > const& ) > printersChanged;

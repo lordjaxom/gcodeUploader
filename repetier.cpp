@@ -163,10 +163,12 @@ namespace gcu {
 
     void RepetierClient::upload(
             std::string const& printer, std::string const& modelName, std::string const& modelGroup,
-            std::filesystem::path const& gcodePath, repetier::Callback<> callback )
+            std::filesystem::path const& gcodePath, std::filesystem::path const& executablePath,
+            repetier::Callback<> callback )
     {
+        std::string curlPath = (executablePath / std::filesystem::path( "curl" )).string();
         std::string command = cnv::toString(
-                "curl -s -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: ", apikey_, "\" ",
+                curlPath, " -s -X POST -H \"Content-Type: multipart/form-data\" -H \"x-api-key: ", apikey_, "\" ",
                 "-F \"a=upload\" -F \"name=", utf8::toUtf8( modelName ), "\" -F \"group=", utf8::toUtf8( modelGroup ),
                 "\" -F \"filename=@", gcodePath.string(), "\" ",
                 Url( url::http( port_ ), hostname_, "/printer/model/"_c, printer ) );

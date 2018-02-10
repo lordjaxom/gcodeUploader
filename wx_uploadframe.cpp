@@ -2,7 +2,9 @@
 #include <locale>
 #include <utility>
 
+#include <wx/filename.h>
 #include <wx/msgdlg.h>
+#include <wx/stdpaths.h>
 #include <wx/textdlg.h>
 
 #include "printer_service.hpp"
@@ -76,7 +78,8 @@ namespace gct {
     {
         printerService_->upload(
                 printer.ToStdString(), modelName.ToStdString(), modelGroup.ToStdString(), gcodePath_,
-                [this, deleteFile] {
+                wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath().ToStdString(),
+                [this, deleteFile]() {
                     if ( deleteFile ) {
                         std::remove( gcodePath_.string().c_str() );
                     }

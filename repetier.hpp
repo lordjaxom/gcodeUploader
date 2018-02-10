@@ -42,7 +42,8 @@ namespace gcu {
 
         void upload(
                 std::string const& printer, std::string const& modelName, std::string const& modelGroup,
-                std::filesystem::path const& gcodePath, repetier::Callback<> callback );
+                std::filesystem::path const& gcodePath, std::filesystem::path const& executablePath,
+                repetier::Callback<> callback );
 
     private:
         std::string hostname_;

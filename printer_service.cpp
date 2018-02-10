@@ -106,10 +106,11 @@ namespace gcu {
 
     void PrinterService::upload(
             std::string const& printer, std::string const& modelName, std::string const& modelGroup,
-            std::filesystem::path const& gcodePath, std::function< void() > callback )
+            std::filesystem::path const& gcodePath, std::filesystem::path const& executablePath,
+            std::function< void() > callback )
     {
         client_.upload(
-                printer, modelName, modelGroup, gcodePath,
+                printer, modelName, modelGroup, gcodePath, executablePath,
                 [this, callback = std::move( callback )]( auto ec ) {
                     std::lock_guard< std::recursive_mutex > lock( mutex_ );
                     if ( this->success( ec ) && callback ) {
