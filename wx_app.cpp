@@ -6,12 +6,17 @@
 #include <wx/cmdline.h>
 #include <wx/msgdlg.h>
 
-#include "printer_service.hpp"
+#include <repetier/frontend.hpp>
+#include <repetier/types.hpp>
+
 #include <wx/msw/winundef.h>
 
 #include "wx_app.hpp"
-#include "wx_explorerframe.hpp"
+// #include "wx_explorerframe.hpp"
 #include "wx_uploadframe.hpp"
+
+using namespace prnet;
+using namespace std;
 
 namespace gct {
 
@@ -40,8 +45,9 @@ namespace gct {
             return false;
         }
 
-        auto printerService = std::make_shared< gcu::PrinterService >(
-                hostname_.ToStdString(), port_, apikey_.ToStdString() );
+        rep::Endpoint endpoint( hostname_.ToStdString(), to_string( port_ ), apikey_.ToStdString() );
+        auto frontend = make_shared< rep::Frontend >( context_, endpoint );
+        thread_ = { [this] { context_.run(); } };
 
         wxFrame* frame;
         switch ( command_ ) {

@@ -7,20 +7,23 @@
 #include <wx/stdpaths.h>
 #include <wx/textdlg.h>
 
-#include "printer_service.hpp"
+#include <repetier/frontend.hpp>
+
 #include <wx/msw/winundef.h>
 
 #include "wx_clientptr.hpp"
 #include "wx_uploadframe.hpp"
-#include "wx_explorerframe.hpp"
+
+using namespace prnet;
+using namespace std;
 
 namespace gct {
 
     UploadFrame::UploadFrame(
-            std::shared_ptr< gcu::PrinterService > printerService, std::filesystem::path gcodePath,
+            shared_ptr< rep::Frontend > frontend, std::filesystem::path gcodePath,
             wxString printer, wxString modelName, bool deleteFile )
             : UploadFrameBase( nullptr )
-            , printerService_( std::move( printerService ) )
+            , frontend_( std::move( frontend ) )
             , gcodePath_( std::move( gcodePath ) )
             , selectedPrinter_( std::move( printer ) )
             , enteredModelName_( !modelName.empty() ? std::move( modelName ) : gcodePath_.stem().string() )
@@ -36,23 +39,23 @@ namespace gct {
         uploadButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnUploadClicked(); } );
         toolBar_->Bind( wxEVT_TOOL, [this]( auto& ) { this->OnToolBarExplore(); }, gctID_EXPLORE );
 
-        printerService_->connectionLost.connect( [this]( auto ec ) {
+        frontend_->on_disconnect( [this]( auto ec ) {
             this->CallAfter( [=] {
                 this->OnConnectionLost( ec );
             } );
         } );
-        printerService_->printersChanged.connect( [this]( auto const& printers ) {
-            this->CallAfter( [=, printers = printers]() mutable {
+        frontend_->on_printers( [this]( auto const& printers ) {
+            this->CallAfter( [this, printers]() mutable {
                 this->OnPrintersChanged( std::move( printers ) );
             } );
         } );
-        printerService_->modelGroupsChanged.connect( [this]( auto const& printer, auto const& modelGroups ) {
-            this->CallAfter( [=, modelGroups = modelGroups]() mutable {
+        frontend_->on_groups( [this]( auto const& printer, auto const& modelGroups ) {
+            this->CallAfter( [this, modelGroups]() mutable {
                 this->OnModelGroupsChanged( printer, std::move( modelGroups ) );
             } );
         } );
-        printerService_->modelsChanged.connect( [this]( auto const& printer, auto const& models ) {
-            this->CallAfter( [=, models = models]() mutable {
+        frontend_->on_models( [this]( auto const& printer, auto const& models ) {
+            this->CallAfter( [this, models]() mutable {
                 this->OnModelsChanged( printer, std::move( models ) );
             } );
         } );

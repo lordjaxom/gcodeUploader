@@ -2,6 +2,9 @@
 #define GCODEUPLOADER_WX_APP_HPP
 
 #include <cstdint>
+#include <thread>
+
+#include <boost/asio/io_context.hpp>
 
 #include <wx/app.h>
 #include <wx/string.h>
@@ -26,6 +29,9 @@ namespace gct {
         virtual bool OnCmdLineParsed( wxCmdLineParser& parser ) override;
 
     private:
+        boost::asio::io_context context_;
+        std::thread thread_;
+
         wxString hostname_;
         std::uint16_t port_;
         wxString apikey_;

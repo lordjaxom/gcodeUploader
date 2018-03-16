@@ -6,14 +6,11 @@
 #include <string>
 #include <system_error>
 
+#include <repetier/forward.hpp>
+#include <repetier/types.hpp>
+
 #include "std/filesystem.hpp"
-
-#include "repetier_definitions.hpp"
 #include "wx_generated.h"
-
-namespace gcu {
-    class PrinterService;
-} // namespace gcu
 
 namespace gct {
 
@@ -24,7 +21,7 @@ namespace gct {
 
     public:
         UploadFrame(
-                std::shared_ptr< gcu::PrinterService > printerService, std::filesystem::path gcodePath,
+                std::shared_ptr< prnet::rep::Frontend > frontend, std::filesystem::path gcodePath,
                 wxString printer, wxString modelName, bool deleteFile );
         UploadFrame( UploadFrame const& ) = delete;
 
@@ -43,16 +40,16 @@ namespace gct {
         void OnToolBarExplore();
 
         void OnConnectionLost( std::error_code ec );
-        void OnPrintersChanged( std::vector< gcu::repetier::Printer >&& printers );
-        void OnModelGroupsChanged( std::string const& printer, std::vector< gcu::repetier::ModelGroup >&& modelGroups );
-        void OnModelsChanged( std::string const& printer, std::vector< gcu::repetier::Model >&& models );
+        void OnPrintersChanged( std::vector< prnet::rep::Printer >&& printers );
+        void OnModelGroupsChanged( std::string const& printer, std::vector< prnet::rep::ModelGroup >&& modelGroups );
+        void OnModelsChanged( std::string const& printer, std::vector< prnet::rep::Model >&& models );
 
-        std::shared_ptr< gcu::PrinterService > printerService_;
+        std::shared_ptr< prnet::rep::Frontend > frontend_;
         std::filesystem::path gcodePath_;
         wxString selectedPrinter_;
         wxString selectedModelGroup_;
         wxString enteredModelName_;
-        std::vector< gcu::repetier::Model > models_;
+        std::vector< prnet::rep::Model > models_;
     };
 
 } // namespace gct
