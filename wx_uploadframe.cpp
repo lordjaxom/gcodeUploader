@@ -50,16 +50,16 @@ namespace gct {
             } );
         } );
         frontend_->on_groups( [this]( auto const& printer, auto const& modelGroups ) {
-            this->CallAfter( [this, modelGroups]() mutable {
+            this->CallAfter( [this, printer, modelGroups]() mutable {
                 this->OnModelGroupsChanged( printer, std::move( modelGroups ) );
             } );
         } );
         frontend_->on_models( [this]( auto const& printer, auto const& models ) {
-            this->CallAfter( [this, models]() mutable {
+            this->CallAfter( [this, printer, models]() mutable {
                 this->OnModelsChanged( printer, std::move( models ) );
             } );
         } );
-        printerService_->requestPrinters();
+        frontend_->requestPrinters();
     }
 
     void UploadFrame::CheckModelNameExists()
@@ -94,10 +94,10 @@ namespace gct {
     {
         int selection = printerChoice_->GetSelection();
         if ( selection != wxNOT_FOUND ) {
-            selectedPrinter_ = wxClientPtrCast< gcu::repetier::Printer >(
+            selectedPrinter_ = wxClientPtrCast< rep::Printer >(
                     printerChoice_->GetClientObject( (unsigned) selection ) ).slug();
-            printerService_->requestModelGroups( selectedPrinter_.ToStdString() );
-            printerService_->requestModels( selectedPrinter_.ToStdString() );
+            frontend_->requestModelGroups( selectedPrinter_.ToStdString() );
+            frontend_->requestModels( selectedPrinter_.ToStdString() );
         }
     }
 
@@ -105,7 +105,7 @@ namespace gct {
     {
         int selection = modelGroupChoice_->GetSelection();
         if ( selection != wxNOT_FOUND ) {
-            selectedModelGroup_ = wxClientPtrCast< gcu::repetier::ModelGroup >(
+            selectedModelGroup_ = wxClientPtrCast< rep::ModelGroup >(
                     modelGroupChoice_->GetClientObject( (unsigned) selection ) ).name();
             uploadButton_->Enable( true );
             CheckModelNameExists();
