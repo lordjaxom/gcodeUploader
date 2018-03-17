@@ -29,13 +29,10 @@ if(WIN32)
 endif()
 
 add_executable(gcodeTool
-        utf8.cpp
-        utf8.hpp
         wx_generated.cpp
         wx_generated.h
         wx_resource.rc
         wx_app.cpp
-        wx_app.hpp
         wx_uploadframe.cpp
         wx_uploadframe.hpp
         wx_clientptr.hpp)
