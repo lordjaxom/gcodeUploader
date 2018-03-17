@@ -36,9 +36,9 @@ public:
             , frontend_( frontend )
             , gcodePath_( move( gcodePath ) )
             , selectedPrinter_( move( printer ) )
-            , enteredModelName_( !modelName.empty() ? move( modelName ) : gcodePath_.stem().string() )
+            , enteredModelName_( !modelName.empty() ? move( modelName ) : gcodePath_.stem().native() )
     {
-        gcodeFileText_->SetValue( gcodePath_.filename().string() );
+        gcodeFileText_->SetValue( gcodePath_.filename().native() );
         deleteFileCheckbox_->SetValue( deleteFile );
         modelNameText_->SetValue( enteredModelName_ );
 

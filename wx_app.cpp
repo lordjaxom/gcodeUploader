@@ -86,10 +86,10 @@ public:
                 }
                 command_ = UPLOAD;
 
-                auto gcodePath = parser.GetParam( 1 );
-                gcodePath_ = gcodePath.ToStdString();
+                auto gcodePathWx = parser.GetParam( 1 );
+                gcodePath_ = gcodePathWx.ToStdString();
                 if ( !std::filesystem::exists( gcodePath_ ) ) {
-                    wxMessageBox( wxString::Format( _( "G-Code file \"%s\" does not exist" ), gcodePath.c_str() ), _( "Error" ), wxOK | wxICON_ERROR );
+                    wxMessageBox( wxString::Format( _( "G-Code file \"%s\" does not exist" ), gcodePathWx.c_str() ), _( "Error" ), wxOK | wxICON_ERROR );
                     return false;
                 }
             }
@@ -113,7 +113,7 @@ public:
             return false;
         }
 
-        logger::threshold( logger::Debug );
+        Logger::threshold( Logger::Level::debug );
 
         rep::Endpoint endpoint( hostname_.ToStdString(), to_string( port_ ), apikey_.ToStdString() );
         frontend_ = make_unique< rep::Frontend >( ioContext_, move( endpoint ) );
