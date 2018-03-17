@@ -2,45 +2,45 @@
 #define GCODEUPLOADER_WX_APP_HPP
 
 #include <cstdint>
-#include <thread>
-
-#include <boost/asio/io_context.hpp>
+#include <memory>
 
 #include <wx/app.h>
 #include <wx/string.h>
 
+#include "std/filesystem.hpp"
+
 namespace gct {
 
-    class GctApp
-            : public wxApp
+struct FrontendContext;
+
+class GctApp
+        : public wxApp
+{
+    enum Command
     {
-        enum Command
-        {
-            UPLOAD,
-            EXPLORE
-        };
-
-    public:
-        GctApp();
-        GctApp( GctApp const& ) = delete;
-
-        virtual bool OnInit() override;
-        virtual void OnInitCmdLine( wxCmdLineParser& parser ) override;
-        virtual bool OnCmdLineParsed( wxCmdLineParser& parser ) override;
-
-    private:
-        boost::asio::io_context context_;
-        std::thread thread_;
-
-        wxString hostname_;
-        std::uint16_t port_;
-        wxString apikey_;
-        wxString printer_;
-        wxString modelName_;
-        bool deleteFile_;
-        Command command_;
-        wxString gcodePath_;
+        UPLOAD,
+        EXPLORE
     };
+
+public:
+    GctApp();
+    GctApp( GctApp const& ) = delete;
+
+    void OnInitCmdLine( wxCmdLineParser& parser ) override;
+    bool OnCmdLineParsed( wxCmdLineParser& parser ) override;
+    bool OnInit() override;
+
+private:
+    wxString hostname_;
+    std::uint16_t port_;
+    wxString apikey_;
+    wxString printer_;
+    wxString modelName_;
+    bool deleteFile_;
+    Command command_;
+    std::filesystem::path gcodePath_;
+    std::unique_ptr< FrontendContext > frontendContext_;
+};
 
 } // namespace gct
 

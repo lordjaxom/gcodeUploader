@@ -20,9 +20,8 @@ namespace gct {
         static constexpr std::size_t MODEL_NOT_FOUND = std::numeric_limits< std::size_t >::max();
 
     public:
-        UploadFrame(
-                std::shared_ptr< prnet::rep::Frontend > frontend, std::filesystem::path gcodePath,
-                wxString printer, wxString modelName, bool deleteFile );
+        UploadFrame( prnet::rep::Frontend& frontend, std::filesystem::path gcodePath, wxString printer,
+                     wxString modelName, bool deleteFile );
         UploadFrame( UploadFrame const& ) = delete;
 
     private:
@@ -44,7 +43,7 @@ namespace gct {
         void OnModelGroupsChanged( std::string const& printer, std::vector< prnet::rep::ModelGroup >&& modelGroups );
         void OnModelsChanged( std::string const& printer, std::vector< prnet::rep::Model >&& models );
 
-        std::shared_ptr< prnet::rep::Frontend > frontend_;
+        prnet::rep::Frontend& frontend_;
         std::filesystem::path gcodePath_;
         wxString selectedPrinter_;
         wxString selectedModelGroup_;

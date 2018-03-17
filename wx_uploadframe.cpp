@@ -8,9 +8,11 @@
 #include <wx/textdlg.h>
 
 #include <repetier/frontend.hpp>
+#include <repetier/upload.hpp>
 
 #include <wx/msw/winundef.h>
 
+#include "utf8.hpp"
 #include "wx_clientptr.hpp"
 #include "wx_uploadframe.hpp"
 
@@ -19,195 +21,192 @@ using namespace std;
 
 namespace gct {
 
-    UploadFrame::UploadFrame(
-            shared_ptr< rep::Frontend > frontend, std::filesystem::path gcodePath,
-            wxString printer, wxString modelName, bool deleteFile )
-            : UploadFrameBase( nullptr )
-            , frontend_( std::move( frontend ) )
-            , gcodePath_( std::move( gcodePath ) )
-            , selectedPrinter_( std::move( printer ) )
-            , enteredModelName_( !modelName.empty() ? std::move( modelName ) : gcodePath_.stem().string() )
-    {
-        gcodeFileText_->SetValue( gcodePath_.filename().string() );
-        deleteFileCheckbox_->SetValue( deleteFile );
-        modelNameText_->SetValue( enteredModelName_ );
+UploadFrame::UploadFrame( rep::Frontend& frontend, std::filesystem::path gcodePath,
+                          wxString printer, wxString modelName, bool deleteFile )
+        : UploadFrameBase( nullptr )
+        , frontend_( frontend )
+        , gcodePath_( move( gcodePath ) )
+        , selectedPrinter_( move( printer ) )
+        , enteredModelName_( !modelName.empty() ? move( modelName ) : gcodePath_.stem().string() )
+{
+    gcodeFileText_->SetValue( gcodePath_.filename().string() );
+    deleteFileCheckbox_->SetValue( deleteFile );
+    modelNameText_->SetValue( enteredModelName_ );
 
-        printerChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnPrinterSelected(); } );
-        modelGroupChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnModelGroupSelected(); } );
-        addModelGroupButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnAddModelGroupClicked(); } );
-        modelNameText_->Bind( wxEVT_TEXT, [this]( auto& ) { this->OnModelNameChanged(); } );
-        uploadButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnUploadClicked(); } );
-        toolBar_->Bind( wxEVT_TOOL, [this]( auto& ) { this->OnToolBarExplore(); }, gctID_EXPLORE );
+    printerChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnPrinterSelected(); } );
+    modelGroupChoice_->Bind( wxEVT_CHOICE, [this]( auto& ) { this->OnModelGroupSelected(); } );
+    addModelGroupButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnAddModelGroupClicked(); } );
+    modelNameText_->Bind( wxEVT_TEXT, [this]( auto& ) { this->OnModelNameChanged(); } );
+    uploadButton_->Bind( wxEVT_BUTTON, [this]( auto& ) { this->OnUploadClicked(); } );
+    toolBar_->Bind( wxEVT_TOOL, [this]( auto& ) { this->OnToolBarExplore(); }, gctID_EXPLORE );
 
-        frontend_->on_disconnect( [this]( auto ec ) {
-            this->CallAfter( [=] {
-                this->OnConnectionLost( ec );
-            } );
+    frontend_.on_disconnect( [this]( auto ec ) {
+        this->CallAfter( [this, ec] {
+            this->OnConnectionLost( ec );
         } );
-        frontend_->on_printers( [this]( auto const& printers ) {
-            this->CallAfter( [this, printers]() mutable {
-                this->OnPrintersChanged( std::move( printers ) );
-            } );
+    } );
+    frontend_.on_printers( [this]( auto printers ) {
+        this->CallAfter( [this, printers]() mutable {
+            this->OnPrintersChanged( move( printers ) );
         } );
-        frontend_->on_groups( [this]( auto const& printer, auto const& modelGroups ) {
-            this->CallAfter( [this, printer, modelGroups]() mutable {
-                this->OnModelGroupsChanged( printer, std::move( modelGroups ) );
-            } );
+    } );
+    frontend_.on_groups( [this]( auto printer, auto modelGroups ) {
+        this->CallAfter( [this, printer, modelGroups]() mutable {
+            this->OnModelGroupsChanged( printer, move( modelGroups ) );
         } );
-        frontend_->on_models( [this]( auto const& printer, auto const& models ) {
-            this->CallAfter( [this, printer, models]() mutable {
-                this->OnModelsChanged( printer, std::move( models ) );
-            } );
+    } );
+    frontend_.on_models( [this]( auto printer, auto models ) {
+        this->CallAfter( [this, printer, models]() mutable {
+            this->OnModelsChanged( printer, move( models ) );
         } );
-        frontend_->requestPrinters();
-    }
+    } );
+    frontend_.requestPrinters();
+}
 
-    void UploadFrame::CheckModelNameExists()
-    {
-        infoLabel_->SetLabel(
-                FindSelectedModelId() != MODEL_NOT_FOUND ? _( "Existing G-Code file will be overwritten!" ) : _( "" ) );
-    }
+void UploadFrame::CheckModelNameExists()
+{
+    infoLabel_->SetLabel(
+            FindSelectedModelId() != MODEL_NOT_FOUND ? _( "Existing G-Code file will be overwritten!" ) : _( "" ) );
+}
 
-    std::size_t UploadFrame::FindSelectedModelId()
-    {
-        auto it = std::find_if( models_.begin(), models_.end(), [this]( auto const& item ) {
-            return item.name() == enteredModelName_ && item.modelGroup() == selectedModelGroup_;
-        } );
-        return it != models_.end() ? it->id() : MODEL_NOT_FOUND;
-    }
+size_t UploadFrame::FindSelectedModelId()
+{
+    auto it = find_if( models_.begin(), models_.end(), [this]( auto const& item ) {
+        return item.name() == enteredModelName_ && item.modelGroup() == selectedModelGroup_;
+    } );
+    return it != models_.end() ? it->id() : MODEL_NOT_FOUND;
+}
 
-    void UploadFrame::PerformUpload(
-            wxString const& printer, wxString const& modelName, wxString const& modelGroup, bool deleteFile )
-    {
-        printerService_->upload(
-                printer.ToStdString(), modelName.ToStdString(), modelGroup.ToStdString(), gcodePath_,
-                wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath().ToStdString(),
-                [this, deleteFile]() {
-                    if ( deleteFile ) {
-                        std::remove( gcodePath_.string().c_str() );
-                    }
-                    Close();
-                } );
-    }
-
-    void UploadFrame::OnPrinterSelected()
-    {
-        int selection = printerChoice_->GetSelection();
-        if ( selection != wxNOT_FOUND ) {
-            selectedPrinter_ = wxClientPtrCast< rep::Printer >(
-                    printerChoice_->GetClientObject( (unsigned) selection ) ).slug();
-            frontend_->requestModelGroups( selectedPrinter_.ToStdString() );
-            frontend_->requestModels( selectedPrinter_.ToStdString() );
+void UploadFrame::PerformUpload(
+        wxString const& printer, wxString const& modelName, wxString const& modelGroup, bool deleteFile )
+{
+    frontend_.upload( rep::model_ident( printer.ToStdString(), modelGroup.ToStdString(), gcu::utf8::toUtf8( modelName.ToStdString() ) ),
+                      gcodePath_, [this, deleteFile]( auto ec ) {
+        if ( ec ) {
+            wxMessageBox( wxString::Format( _( "Upload failed: %s" ), ec.message().c_str() ) );
+        } else if ( deleteFile ) {
+            remove( gcodePath_.string().c_str() );
         }
-    }
+        this->Close();
+    } );
+}
 
-    void UploadFrame::OnModelGroupSelected()
-    {
-        int selection = modelGroupChoice_->GetSelection();
-        if ( selection != wxNOT_FOUND ) {
-            selectedModelGroup_ = wxClientPtrCast< rep::ModelGroup >(
-                    modelGroupChoice_->GetClientObject( (unsigned) selection ) ).name();
-            uploadButton_->Enable( true );
-            CheckModelNameExists();
-        }
+void UploadFrame::OnPrinterSelected()
+{
+    int selection = printerChoice_->GetSelection();
+    if ( selection != wxNOT_FOUND ) {
+        selectedPrinter_ = wxClientPtrCast< rep::Printer >(
+                printerChoice_->GetClientObject( (unsigned) selection ) ).slug();
+        frontend_.requestModelGroups( selectedPrinter_.ToStdString() );
+        frontend_.requestModels( selectedPrinter_.ToStdString() );
     }
+}
 
-    void UploadFrame::OnAddModelGroupClicked()
-    {
-        wxTextEntryDialog dialog( this, _( "Please enter the name of the new model group" ) );
-        // TODO: input validation
-        if ( dialog.ShowModal() == wxID_OK ) {
-            selectedModelGroup_ = dialog.GetValue();
-            printerService_->addModelGroup( selectedPrinter_.ToStdString(), selectedModelGroup_.ToStdString() );
-        }
-    }
-
-    void UploadFrame::OnModelNameChanged()
-    {
-        enteredModelName_ = modelNameText_->GetLineText( 0 ).ToStdString();
+void UploadFrame::OnModelGroupSelected()
+{
+    int selection = modelGroupChoice_->GetSelection();
+    if ( selection != wxNOT_FOUND ) {
+        selectedModelGroup_ = wxClientPtrCast< rep::ModelGroup >(
+                modelGroupChoice_->GetClientObject( (unsigned) selection ) ).name();
+        uploadButton_->Enable( true );
         CheckModelNameExists();
     }
+}
 
-    void UploadFrame::OnUploadClicked()
-    {
-        Enable( false );
+void UploadFrame::OnAddModelGroupClicked()
+{
+    wxTextEntryDialog dialog( this, _( "Please enter the name of the new model group" ) );
+    // TODO: input validation
+    if ( dialog.ShowModal() == wxID_OK ) {
+        selectedModelGroup_ = dialog.GetValue();
+        frontend_.addModelGroup( selectedPrinter_.ToStdString(), selectedModelGroup_.ToStdString() );
+    }
+}
 
-        auto modelId = FindSelectedModelId();
-        if ( modelId != MODEL_NOT_FOUND ) {
-            printerService_->removeModel(
-                    selectedPrinter_.ToStdString(), modelId,
-                    [this, printer = selectedPrinter_, modelName = enteredModelName_,
-                            modelGroup = selectedModelGroup_, deleteFile = deleteFileCheckbox_->GetValue()] {
-                        PerformUpload( printer, modelName, modelGroup, deleteFile );
-                    } );
+void UploadFrame::OnModelNameChanged()
+{
+    enteredModelName_ = modelNameText_->GetLineText( 0 ).ToStdString();
+    CheckModelNameExists();
+}
+
+void UploadFrame::OnUploadClicked()
+{
+    Enable( false );
+
+    auto modelId = FindSelectedModelId();
+    if ( modelId != MODEL_NOT_FOUND ) {
+        frontend_.removeModel( selectedPrinter_.ToStdString(), modelId,
+                               [this, printer = selectedPrinter_, modelName = enteredModelName_,
+                                       modelGroup = selectedModelGroup_, deleteFile = deleteFileCheckbox_->GetValue()] {
+                                   PerformUpload( printer, modelName, modelGroup, deleteFile );
+                               } );
+    }
+    else {
+        PerformUpload( selectedPrinter_, enteredModelName_, selectedModelGroup_, deleteFileCheckbox_->GetValue() );
+    }
+}
+
+void UploadFrame::OnToolBarExplore()
+{
+    // ExplorerFrame* frame = new ExplorerFrame( this, printerService_ );
+    // frame->Show( true );
+}
+
+void UploadFrame::OnConnectionLost( error_code ec )
+{
+    wxMessageBox( wxString::Format( _( "Connection lost: %s" ), ec.message().c_str() ), "Error", wxOK | wxICON_ERROR, this );
+    Close();
+}
+
+void UploadFrame::OnPrintersChanged( vector< rep::Printer >&& printers )
+{
+    printerChoice_->Clear();
+
+    int selected = 0;
+    for ( auto&& printer : printers ) {
+        auto ptr = new wxClientPtr< rep::Printer >( move( printer ) );
+        int index = printerChoice_->Append( ( *ptr )->name(), ptr );
+        if ( ( *ptr )->slug() == selectedPrinter_ ) {
+            selected = index;
         }
-        else {
-            PerformUpload( selectedPrinter_, enteredModelName_, selectedModelGroup_, deleteFileCheckbox_->GetValue() );
-        }
     }
-
-    void UploadFrame::OnToolBarExplore()
-    {
-        ExplorerFrame* frame = new ExplorerFrame( this, printerService_ );
-        frame->Show( true );
+    if ( !printers.empty() ) {
+        printerChoice_->Enable( true );
+        printerChoice_->Select( selected );
+        OnPrinterSelected();
     }
-
-    void UploadFrame::OnConnectionLost( std::error_code ec )
-    {
-        wxMessageBox( ec.message(), "Error", wxOK | wxICON_ERROR, this );
-        Close();
+    else {
+        printerChoice_->Enable( false );
     }
+}
 
-    void UploadFrame::OnPrintersChanged( std::vector< gcu::repetier::Printer >&& printers )
-    {
-        printerChoice_->Clear();
+void UploadFrame::OnModelGroupsChanged( string const& printer, vector< rep::ModelGroup >&& modelGroups )
+{
+    if ( printer == selectedPrinter_ ) {
+        modelGroupChoice_->Clear();
 
         int selected = 0;
-        for ( auto&& printer : printers ) {
-            auto ptr = new wxClientPtr< gcu::repetier::Printer >( std::move( printer ) );
-            int index = printerChoice_->Append( ( *ptr )->name(), ptr );
-            if ( ( *ptr )->slug() == selectedPrinter_ ) {
+        for ( auto&& modelGroup : modelGroups ) {
+            auto ptr = new wxClientPtr< rep::ModelGroup >( move( modelGroup ) );
+            int index = modelGroupChoice_->Append(
+                    ( *ptr )->defaultGroup() ? _( "Default" ) : ( *ptr )->name(), ptr );
+            if ( ( *ptr )->name() == selectedModelGroup_ ) {
                 selected = index;
             }
         }
-        if ( !printers.empty() ) {
-            printerChoice_->Enable( true );
-            printerChoice_->Select( selected );
-            OnPrinterSelected();
-        }
-        else {
-            printerChoice_->Enable( false );
-        }
+        modelGroupChoice_->Enable( true );
+        modelGroupChoice_->Select( selected );
+        OnModelGroupSelected();
+        addModelGroupButton_->Enable( true );
     }
+}
 
-    void UploadFrame::OnModelGroupsChanged(
-            std::string const& printer, std::vector< gcu::repetier::ModelGroup >&& modelGroups )
-    {
-        if ( printer == selectedPrinter_ ) {
-            modelGroupChoice_->Clear();
-
-            int selected = 0;
-            for ( auto&& modelGroup : modelGroups ) {
-                auto ptr = new wxClientPtr< gcu::repetier::ModelGroup >( std::move( modelGroup ) );
-                int index = modelGroupChoice_->Append(
-                        ( *ptr )->defaultGroup() ? _( "Default" ) : ( *ptr )->name(), ptr );
-                if ( ( *ptr )->name() == selectedModelGroup_ ) {
-                    selected = index;
-                }
-            }
-            modelGroupChoice_->Enable( true );
-            modelGroupChoice_->Select( selected );
-            OnModelGroupSelected();
-            addModelGroupButton_->Enable( true );
-        }
+void UploadFrame::OnModelsChanged( string const& printer, vector< rep::Model >&& models )
+{
+    if ( printer == selectedPrinter_ ) {
+        models_ = move( models );
+        CheckModelNameExists();
     }
-
-    void UploadFrame::OnModelsChanged( std::string const& printer, std::vector< gcu::repetier::Model >&& models )
-    {
-        if ( printer == selectedPrinter_ ) {
-            models_ = std::move( models );
-            CheckModelNameExists();
-        }
-    }
+}
 
 } // namespace gct

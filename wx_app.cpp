@@ -1,11 +1,12 @@
-#include <memory>
+#include <thread>
+#include <utility>
 
-#include <boost/convert.hpp>
-#include <boost/convert/spirit.hpp>
+#include <boost/asio/io_context.hpp>
 
 #include <wx/cmdline.h>
 #include <wx/msgdlg.h>
 
+#include <core/logging.hpp>
 #include <repetier/frontend.hpp>
 #include <repetier/types.hpp>
 
@@ -18,96 +19,124 @@
 using namespace prnet;
 using namespace std;
 
+namespace asio = boost::asio;
+
 namespace gct {
 
-    static wxCmdLineEntryDesc cmdLineDesc[] {
-            { wxCMD_LINE_OPTION, _( "H" ), _( "host" ), _( "Hostname of the printer server" ),
-                    wxCMD_LINE_VAL_STRING, wxCMD_LINE_OPTION_MANDATORY },
-            { wxCMD_LINE_OPTION, _( "P" ), _( "port" ), _( "Port of the printer server" ),
-                    wxCMD_LINE_VAL_NUMBER, wxCMD_LINE_OPTION_MANDATORY },
-            { wxCMD_LINE_OPTION, _( "a" ), _( "apikey" ), _( "API key for unrestricted access to the print server" ),
-                    wxCMD_LINE_VAL_STRING, wxCMD_LINE_OPTION_MANDATORY },
-            { wxCMD_LINE_OPTION, _( "p" ), _( "printer" ), _( "Printer that gets selected initially" ),
-                    wxCMD_LINE_VAL_STRING },
-            { wxCMD_LINE_OPTION, _( "m" ), _( "modelname" ), _( "Suggestion for model name" ),
-                    wxCMD_LINE_VAL_STRING },
-            { wxCMD_LINE_SWITCH, _( "d" ), _( "delete" ), _( "Whether the G-Code file is to be deleted after uploading" ) },
-            { wxCMD_LINE_PARAM, nullptr, nullptr, _( "Commands and parameters" ),
-                    wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
-            { wxCMD_LINE_NONE }
-    };
+static logger logger( "gct::GctApp" );
 
-    GctApp::GctApp() = default;
+struct FrontendContext
+{
+    explicit FrontendContext( rep::Endpoint&& endpoint )
+            : frontend( context, move( endpoint ) )
+            , thread( [this] { context.run(); } ) {}
 
-    bool GctApp::OnInit()
+    ~FrontendContext()
     {
-        if ( !wxApp::OnInit() ) {
-            return false;
-        }
-
-        rep::Endpoint endpoint( hostname_.ToStdString(), to_string( port_ ), apikey_.ToStdString() );
-        auto frontend = make_shared< rep::Frontend >( context_, endpoint );
-        thread_ = { [this] { context_.run(); } };
-
-        wxFrame* frame;
-        switch ( command_ ) {
-            case UPLOAD:
-                frame = new UploadFrame( printerService, gcodePath_.ToStdString(), printer_, modelName_, deleteFile_ );
-                break;
-            case EXPLORE:
-                frame = new ExplorerFrame( printerService );
-                break;
-        }
-        frame->Show( true );
-        return true;
+        context.stop();
+        thread.join();
     }
 
-    void GctApp::OnInitCmdLine( wxCmdLineParser& parser )
-    {
-        parser.SetDesc( cmdLineDesc );
-        parser.SetSwitchChars( _( "-" ) );
+    asio::io_context context;
+    rep::Frontend frontend;
+    thread thread;
+};
+
+static wxCmdLineEntryDesc cmdLineDesc[] {
+        { wxCMD_LINE_OPTION, _( "H" ), _( "host" ), _( "Hostname of the printer server" ),
+                wxCMD_LINE_VAL_STRING, wxCMD_LINE_OPTION_MANDATORY },
+        { wxCMD_LINE_OPTION, _( "P" ), _( "port" ), _( "Port of the printer server" ),
+                wxCMD_LINE_VAL_NUMBER, wxCMD_LINE_OPTION_MANDATORY },
+        { wxCMD_LINE_OPTION, _( "a" ), _( "apikey" ), _( "API key for unrestricted access to the print server" ),
+                wxCMD_LINE_VAL_STRING, wxCMD_LINE_OPTION_MANDATORY },
+        { wxCMD_LINE_OPTION, _( "p" ), _( "printer" ), _( "Printer that gets selected initially" ),
+                wxCMD_LINE_VAL_STRING },
+        { wxCMD_LINE_OPTION, _( "m" ), _( "modelname" ), _( "Suggestion for model name" ),
+                wxCMD_LINE_VAL_STRING },
+        { wxCMD_LINE_SWITCH, _( "d" ), _( "delete" ), _( "Whether the G-Code file is to be deleted after uploading" ) },
+        { wxCMD_LINE_PARAM, nullptr, nullptr, _( "Commands and parameters" ),
+                wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
+        { wxCMD_LINE_NONE }
+};
+
+GctApp::GctApp() = default;
+
+void GctApp::OnInitCmdLine( wxCmdLineParser& parser )
+{
+    parser.SetDesc( cmdLineDesc );
+    parser.SetSwitchChars( _( "-" ) );
+}
+
+bool GctApp::OnCmdLineParsed( wxCmdLineParser& parser )
+{
+    parser.Found( _( "H" ), &hostname_ );
+    parser.Found( _( "a" ), &apikey_ );
+    parser.Found( _( "p" ), &printer_ );
+    parser.Found( _( "m" ), &modelName_ );
+    deleteFile_ = parser.Found( _( "d" ) );
+
+    long port;
+    parser.Found( _( "P" ), &port );
+    if ( port < std::numeric_limits< std::uint16_t >::min() ||
+         port > std::numeric_limits< std::uint16_t >::max() ) {
+        // TODO
+        return false;
     }
+    port_ = (std::uint16_t) port;
 
-    bool GctApp::OnCmdLineParsed( wxCmdLineParser& parser )
-    {
-        parser.Found( _( "H" ), &hostname_ );
-        parser.Found( _( "a" ), &apikey_ );
-        parser.Found( _( "p" ), &printer_ );
-        parser.Found( _( "m" ), &modelName_ );
-        deleteFile_ = parser.Found( _( "d" ) );
-
-        long port;
-        parser.Found( _( "P" ), &port );
-        if ( port < std::numeric_limits< std::uint16_t >::min() ||
-                port > std::numeric_limits< std::uint16_t >::max() ) {
-            // TODO
-            return false;
-        }
-        port_ = (std::uint16_t) port;
-
-        if ( parser.GetParamCount() > 0 ) {
-            wxString command = parser.GetParam( 0 );
-            if ( command == _( "upload" ) ) {
-                if ( parser.GetParamCount() != 2 ) {
-                    wxMessageBox( _( "The command upload requires a filename" ), _( "Error" ), wxOK | wxICON_ERROR );
-                    return false;
-                }
-                command_ = UPLOAD;
-                gcodePath_ = parser.GetParam( 1 );
+    if ( parser.GetParamCount() > 0 ) {
+        wxString command = parser.GetParam( 0 );
+        if ( command == _( "upload" ) ) {
+            if ( parser.GetParamCount() != 2 ) {
+                wxMessageBox( _( "The command upload requires a filename" ), _( "Error" ), wxOK | wxICON_ERROR );
+                return false;
             }
-            else if ( command == _( "explore" ) ) {
-                command_ = EXPLORE;
-            }
-            else {
-                wxMessageBox( _( "Unknown command " ) + command, _( "Error" ), wxOK | wxICON_ERROR );
+            command_ = UPLOAD;
+
+            auto gcodePath = parser.GetParam( 1 );
+            gcodePath_ = gcodePath.ToStdString();
+            if ( !std::filesystem::exists( gcodePath_ ) ) {
+                wxMessageBox( wxString::Format( _( "G-Code file \"%s\" does not exist" ), gcodePath.c_str() ), _( "Error" ), wxOK | wxICON_ERROR );
                 return false;
             }
         }
-        else {
+        else if ( command == _( "explore" ) ) {
             command_ = EXPLORE;
         }
-        return true;
+        else {
+            wxMessageBox( _( "Unknown command " ) + command, _( "Error" ), wxOK | wxICON_ERROR );
+            return false;
+        }
     }
+    else {
+        command_ = EXPLORE;
+    }
+    return true;
+}
+
+bool GctApp::OnInit()
+{
+    if ( !wxApp::OnInit() ) {
+        return false;
+    }
+
+    logger::threshold( logger::Debug );
+
+    rep::Endpoint endpoint( hostname_.ToStdString(), to_string( port_ ), apikey_.ToStdString() );
+    frontendContext_ = make_unique< FrontendContext >( move( endpoint ) );
+
+    wxFrame* frame;
+    switch ( command_ ) {
+        case UPLOAD:
+            frame = new UploadFrame( frontendContext_->frontend, gcodePath_, printer_, modelName_, deleteFile_ );
+            break;
+        case EXPLORE:
+            // frame = new ExplorerFrame( printerService );
+            break;
+    }
+    frame->Show( true );
+    return true;
+}
 
 } // namespace gct
 

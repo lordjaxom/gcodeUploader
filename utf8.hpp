@@ -15,15 +15,8 @@ namespace gcu {
 
         } // namespace detail
 
-        inline auto fromUtf8( std::string const& utf8 )
-        {
-            return [&]( std::ostream& os ) { detail::fromUtf8( os, utf8.data(), utf8.size() ); };
-        }
-
-        inline auto toUtf8( std::string const& local )
-        {
-            return [&]( std::ostream& os ) { detail::toUtf8( os, local.data(), local.size() ); };
-        }
+        std::string fromUtf8( std::string const& utf8 );
+        std::string toUtf8( std::string const& local );
 
     } // namespace utf8
 } // namespace gcu
