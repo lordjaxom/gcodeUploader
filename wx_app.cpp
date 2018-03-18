@@ -11,9 +11,9 @@
 #include <wx/msgdlg.h>
 #include <wx/string.h>
 
-#include <core/logging.hpp>
-#include <repetier/frontend.hpp>
-#include <repetier/types.hpp>
+#include <3dprnet/core/logging.hpp>
+#include <3dprnet/repetier/frontend.hpp>
+#include <3dprnet/repetier/types.hpp>
 
 #include <wx/msw/winundef.h>
 
@@ -86,10 +86,10 @@ public:
                 }
                 command_ = UPLOAD;
 
-                auto gcodePathWx = parser.GetParam( 1 );
-                gcodePath_ = gcodePathWx.ToStdString();
-                if ( !std::filesystem::exists( gcodePath_ ) ) {
-                    wxMessageBox( wxString::Format( _( "G-Code file \"%s\" does not exist" ), gcodePathWx.c_str() ), _( "Error" ), wxOK | wxICON_ERROR );
+                auto gcodePath = parser.GetParam( 1 );
+                gcodePath_ = gcodePath.ToStdString();
+                if ( !filesystem::exists( gcodePath_ ) ) {
+                    wxMessageBox( wxString::Format( _( "G-Code file \"%s\" does not exist" ), gcodePath.c_str() ), _( "Error" ), wxOK | wxICON_ERROR );
                     return false;
                 }
             }
@@ -146,7 +146,7 @@ private:
     wxString modelName_;
     bool deleteFile_ {};
     Command command_ {};
-    std::filesystem::path gcodePath_;
+    filesystem::path gcodePath_;
 
     asio::io_context ioContext_;
     thread ioThread_;

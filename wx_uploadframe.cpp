@@ -10,8 +10,8 @@
 #include <wx/stdpaths.h>
 #include <wx/textdlg.h>
 
-#include <repetier/frontend.hpp>
-#include <repetier/types.hpp>
+#include <3dprnet/repetier/frontend.hpp>
+#include <3dprnet/repetier/types.hpp>
 
 #include <wx/msw/winundef.h>
 
@@ -30,7 +30,7 @@ class UploadFrame
     static constexpr size_t MODEL_NOT_FOUND = numeric_limits< size_t >::max();
 
 public:
-    UploadFrame( rep::Frontend& frontend, std::filesystem::path&& gcodePath, wxString&& printer,
+    UploadFrame( rep::Frontend& frontend, filesystem::path&& gcodePath, wxString&& printer,
                  wxString&& modelName, bool deleteFile )
             : UploadFrameBase( nullptr )
             , frontend_( frontend )
@@ -94,7 +94,7 @@ private:
                     if ( ec ) {
                         wxMessageBox( wxString::Format( _( "Upload failed: %s" ), ec.message().c_str() ) );
                     } else if ( deleteFile ) {
-                        remove( gcodePath_.string().c_str() );
+                        remove( prnet::filesystem::native_path( gcodePath_ ).c_str() );
                     }
                     this->Close();
                 } );
@@ -221,14 +221,14 @@ private:
 
 
     rep::Frontend& frontend_;
-    std::filesystem::path gcodePath_;
+    filesystem::path gcodePath_;
     wxString selectedPrinter_;
     wxString selectedModelGroup_;
     wxString enteredModelName_;
     vector< rep::Model > models_;
 };
 
-wxFrame* makeUploadFrame( rep::Frontend& frontend, std::filesystem::path gcodePath, wxString printer,
+wxFrame* makeUploadFrame( rep::Frontend& frontend, filesystem::path gcodePath, wxString printer,
                               wxString modelName, bool deleteFile )
 {
     return new UploadFrame( frontend, move( gcodePath ), move( printer ), move( modelName ), deleteFile );

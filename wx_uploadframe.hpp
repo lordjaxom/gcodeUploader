@@ -4,13 +4,12 @@
 #include <wx/frame.h>
 #include <wx/string.h>
 
-#include <repetier/forward.hpp>
-
-#include "std/filesystem.hpp"
+#include <3dprnet/core/filesystem.hpp>
+#include <3dprnet/repetier/forward.hpp>
 
 namespace gct {
 
-wxFrame* makeUploadFrame( prnet::rep::Frontend& frontend, std::filesystem::path gcodePath, wxString printer,
+wxFrame* makeUploadFrame( prnet::rep::Frontend& frontend, prnet::filesystem::path gcodePath, wxString printer,
                           wxString modelName, bool deleteFile );
 
 } // namespace gct
