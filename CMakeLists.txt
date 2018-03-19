@@ -37,10 +37,12 @@ if (WIN32)
     target_link_libraries(gcodeTool ws2_32 version shlwapi setupapi)
 
     file(GLOB LIBS "${CMAKE_CURRENT_LIST_DIR}/lib/*.dll")
-    foreach(LIB "${LIBS}")
-        add_custom_command(TARGET gcodeTool POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy ${LIB} $<TARGET_FILE_DIR:gcodeTool>)
-    endforeach()
+    if(NOT "${LIBS}" STREQUAL "")
+        foreach(LIB "${LIBS}")
+            add_custom_command(TARGET gcodeTool POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy ${LIB} $<TARGET_FILE_DIR:gcodeTool>)
+        endforeach()
+    endif()
     add_custom_command(TARGET gcodeTool POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy ${LIB3DPRNET_ROOT}/cmake-build-${LIB3DPRNET_BUILD_TYPE}${LIB3DPRNET_BUILD_SUFFIX}/lib3dprnet.dll $<TARGET_FILE_DIR:gcodeTool>)
 endif()
